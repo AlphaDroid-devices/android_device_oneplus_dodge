@@ -20,9 +20,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.UserHandle;
 import android.os.Vibrator;
+import android.provider.Settings;
 import android.util.Log;
-
-import lineageos.providers.LineageSettings;
 
 import org.lineageos.internal.util.FileUtils;
 import org.lineageos.device.DeviceSettings.Constants;
@@ -95,8 +94,8 @@ public abstract class SliderControllerBase {
         if (mVibrator == null) {
             return;
         }
-        boolean enabled = LineageSettings.System.getIntForUser(mContext.getContentResolver(),
-                LineageSettings.System.TOUCHSCREEN_GESTURE_HAPTIC_FEEDBACK, 1, UserHandle.USER_CURRENT) != 0;
+        boolean enabled = Settings.System.getIntForUser(mContext.getContentResolver(),
+                Settings.System.TOUCHSCREEN_GESTURE_HAPTIC_FEEDBACK, 1, UserHandle.USER_CURRENT) != 0;
         if (enabled) {
             mVibrator.vibrate(50);
         }

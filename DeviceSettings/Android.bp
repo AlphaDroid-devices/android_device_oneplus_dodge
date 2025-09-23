@@ -16,7 +16,6 @@ android_app {
 
     static_libs: [
         "SettingsLib",
-        "org.lineageos.platform.internal",
     ],
 
     optimize: {

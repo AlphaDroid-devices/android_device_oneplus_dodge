@@ -52,7 +52,7 @@
             android:summary="%s" />
     </PreferenceCategory>
 
-    <PreferenceCategory
+<!--    <PreferenceCategory
         android:key="touchpanel"
         android:title="@string/touchpanel_title">
 
@@ -91,6 +91,6 @@
             android:icon="@drawable/ic_usb2_fc"
             android:summary="@string/usb2_fc_summary"
             android:title="@string/usb2_fc_title" />
-    </PreferenceCategory>
+    </PreferenceCategory>-->
 
 </PreferenceScreen>

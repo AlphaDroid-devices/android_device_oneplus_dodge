@@ -384,14 +384,14 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
         });
     }
 
-    public static void restoreFastChargeSetting(Context context) {
-        if (Utils.fileWritable(FILE_FAST_CHARGE)) {
-            SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
-            boolean value = sharedPrefs.getBoolean(KEY_USB2_SWITCH,
-                Utils.getFileValueAsBoolean(FILE_FAST_CHARGE, false));
-            Utils.writeValue(FILE_FAST_CHARGE, value ? "1" : "0");
-        }
-    }
+    // public static void restoreFastChargeSetting(Context context) {
+    //     if (Utils.fileWritable(FILE_FAST_CHARGE)) {
+    //         SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
+    //         boolean value = sharedPrefs.getBoolean(KEY_USB2_SWITCH,
+    //             Utils.getFileValueAsBoolean(FILE_FAST_CHARGE, false));
+    //         Utils.writeValue(FILE_FAST_CHARGE, value ? "1" : "0");
+    //     }
+    // }
 
     private static int getDefaultResIdForUsage(String usage) {
         switch (usage) {

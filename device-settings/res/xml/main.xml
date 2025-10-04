@@ -94,6 +94,17 @@
     </PreferenceCategory>-->
 
     <PreferenceCategory
+        android:key="display_category"
+        android:title="@string/display_category_title">
+
+        <SwitchPreferenceCompat
+            android:icon="@drawable/ic_dc_dimming"
+            android:key="onepulse_pwm"
+            android:summary="@string/onepulse_pwm_mode_summary"
+            android:title="@string/onepulse_pwm_mode_title" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
         android:key="gaming"
         android:title="@string/gaming_category_title">
 

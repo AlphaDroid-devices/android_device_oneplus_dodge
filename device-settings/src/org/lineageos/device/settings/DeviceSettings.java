@@ -54,6 +54,9 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
     //
     // private static final String FILE_FAST_CHARGE = "/sys/module/oplus_chg/parameters/force_fast_charge";
 
+    private static final String FILE_PWM = "/sys/kernel/oplus_display/pwm_onepulse";
+    private static final String KEY_ONEPULSE_PWM = "onepulse_pwm";
+
     private ListPreference mTopKeyPref;
     private ListPreference mMiddleKeyPref;
     private ListPreference mBottomKeyPref;
@@ -61,6 +64,7 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
     // private SwitchPreferenceCompat mGameModeSwitch;
     // private SwitchPreferenceCompat mEdgeTouchSwitch;
     // private SwitchPreferenceCompat mUSB2FastChargeModeSwitch;
+    private SwitchPreferenceCompat mOnePulsePWMSwitch;
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -97,6 +101,16 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
         // } else {
         //     mUSB2FastChargeModeSwitch.setEnabled(false);
         // }
+
+        mOnePulsePWMSwitch = (SwitchPreferenceCompat) findPreference(KEY_ONEPULSE_PWM);
+        if (Utils.fileWritable(FILE_PWM)) {
+            mOnePulsePWMSwitch.setEnabled(true);
+            mOnePulsePWMSwitch.setChecked(sharedPrefs.getBoolean(KEY_ONEPULSE_PWM,
+                Utils.getFileValueAsBoolean(FILE_PWM, false)));
+            mOnePulsePWMSwitch.setOnPreferenceChangeListener(this);
+        } else {
+            mOnePulsePWMSwitch.setEnabled(false);
+        }
 
         initNotificationSliderPreference();
     }
@@ -138,6 +152,13 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
     	   //  Utils.writeValue(FILE_FAST_CHARGE, enabled ? "1" : "0");
         //     return true;
         // }
+        if (preference == mOnePulsePWMSwitch) {
+            boolean enabled = (Boolean) newValue;
+            SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(getContext());
+            sharedPrefs.edit().putBoolean(KEY_ONEPULSE_PWM, enabled).commit();
+            Utils.writeValue(FILE_PWM, enabled ? "1" : "0");
+            return true;
+        }
 
         String key = preference.getKey();
         switch (key) {
@@ -392,6 +413,15 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
     //         Utils.writeValue(FILE_FAST_CHARGE, value ? "1" : "0");
     //     }
     // }
+
+    public static void restoreOnePulsePwmSetting(Context context) {
+        if (Utils.fileWritable(FILE_PWM)) {
+            SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
+            boolean value = sharedPrefs.getBoolean(KEY_ONEPULSE_PWM,
+                Utils.getFileValueAsBoolean(FILE_PWM, false));
+            Utils.writeValue(FILE_PWM, value ? "1" : "0");
+        }
+    }
 
     private static int getDefaultResIdForUsage(String usage) {
         switch (usage) {

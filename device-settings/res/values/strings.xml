@@ -92,4 +92,12 @@
     <string name="overlay_permission_denied">Overlay permission denied</string>
     <string name="game_bar_tile_label">GameBar</string>
     <string name="game_bar_tile_description">Toggle the game overlay</string>
+
+    <!-- Display -->
+    <string name="display_category_title">Display</string>
+
+    <!-- One-Pulse PWM (Classic) mode -->
+    <string name="onepulse_pwm_mode_title">One-Pulse PWM</string>
+    <string name="onepulse_pwm_mode_summary">Enable One-Pulse (high frequency) PWM to reduce display flicker at mid or high brightness levels</string>
+
 </resources>

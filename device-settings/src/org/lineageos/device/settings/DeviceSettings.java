@@ -54,9 +54,6 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
     //
     // private static final String FILE_FAST_CHARGE = "/sys/module/oplus_chg/parameters/force_fast_charge";
 
-    private static final String FILE_PWM = "/sys/kernel/oplus_display/pwm_onepulse";
-    private static final String KEY_ONEPULSE_PWM = "onepulse_pwm";
-
     private ListPreference mTopKeyPref;
     private ListPreference mMiddleKeyPref;
     private ListPreference mBottomKeyPref;
@@ -102,11 +99,11 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
         //     mUSB2FastChargeModeSwitch.setEnabled(false);
         // }
 
-        mOnePulsePWMSwitch = (SwitchPreferenceCompat) findPreference(KEY_ONEPULSE_PWM);
-        if (Utils.fileWritable(FILE_PWM)) {
+        mOnePulsePWMSwitch = (SwitchPreferenceCompat) findPreference(Constants.KEY_ONEPULSE_PWM);
+        if (Utils.fileWritable(Constants.NODE_ONEPULSE_PWM)) {
             mOnePulsePWMSwitch.setEnabled(true);
-            mOnePulsePWMSwitch.setChecked(sharedPrefs.getBoolean(KEY_ONEPULSE_PWM,
-                Utils.getFileValueAsBoolean(FILE_PWM, false)));
+            mOnePulsePWMSwitch.setChecked(sharedPrefs.getBoolean(Constants.KEY_ONEPULSE_PWM,
+                Utils.getFileValueAsBoolean(Constants.NODE_ONEPULSE_PWM, false)));
             mOnePulsePWMSwitch.setOnPreferenceChangeListener(this);
         } else {
             mOnePulsePWMSwitch.setEnabled(false);
@@ -116,13 +113,13 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
     }
 
     private void initNotificationSliderPreference() {
-        registerPreferenceListener(Constants.NOTIF_SLIDER_USAGE_KEY);
-        registerPreferenceListener(Constants.NOTIF_SLIDER_ACTION_TOP_KEY);
-        registerPreferenceListener(Constants.NOTIF_SLIDER_ACTION_MIDDLE_KEY);
-        registerPreferenceListener(Constants.NOTIF_SLIDER_ACTION_BOTTOM_KEY);
+        registerPreferenceListener(Constants.KEY_NOTIF_SLIDER_USAGE);
+        registerPreferenceListener(Constants.KEY_NOTIF_SLIDER_ACTION_TOP);
+        registerPreferenceListener(Constants.KEY_NOTIF_SLIDER_ACTION_MIDDLE);
+        registerPreferenceListener(Constants.KEY_NOTIF_SLIDER_ACTION_BOTTOM);
 
         ListPreference usagePref = (ListPreference) findPreference(
-                Constants.NOTIF_SLIDER_USAGE_KEY);
+                Constants.KEY_NOTIF_SLIDER_USAGE);
         handleSliderUsageChange(usagePref.getValue());
     }
 
@@ -155,22 +152,22 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
         if (preference == mOnePulsePWMSwitch) {
             boolean enabled = (Boolean) newValue;
             SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(getContext());
-            sharedPrefs.edit().putBoolean(KEY_ONEPULSE_PWM, enabled).commit();
-            Utils.writeValue(FILE_PWM, enabled ? "1" : "0");
+            sharedPrefs.edit().putBoolean(Constants.KEY_ONEPULSE_PWM, enabled).commit();
+            Utils.writeValue(Constants.NODE_ONEPULSE_PWM, enabled ? "1" : "0");
             return true;
         }
 
         String key = preference.getKey();
         switch (key) {
-            case Constants.NOTIF_SLIDER_USAGE_KEY:
+            case Constants.KEY_NOTIF_SLIDER_USAGE:
                 return handleSliderUsageChange((String) newValue) &&
                         handleSliderUsageDefaultsChange((String) newValue) &&
                         notifySliderUsageChange((String) newValue);
-            case Constants.NOTIF_SLIDER_ACTION_TOP_KEY:
+            case Constants.KEY_NOTIF_SLIDER_ACTION_TOP:
                 return notifySliderActionChange(0, (String) newValue);
-            case Constants.NOTIF_SLIDER_ACTION_MIDDLE_KEY:
+            case Constants.KEY_NOTIF_SLIDER_ACTION_MIDDLE:
                 return notifySliderActionChange(1, (String) newValue);
-            case Constants.NOTIF_SLIDER_ACTION_BOTTOM_KEY:
+            case Constants.KEY_NOTIF_SLIDER_ACTION_BOTTOM:
                 return notifySliderActionChange(2, (String) newValue);
             default:
                 break;
@@ -273,11 +270,11 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
     private boolean updateSliderActions(int entriesResId, int entryValuesResId) {
         String[] entries = getResources().getStringArray(entriesResId);
         String[] entryValues = getResources().getStringArray(entryValuesResId);
-        return updateSliderPreference(Constants.NOTIF_SLIDER_ACTION_TOP_KEY,
+        return updateSliderPreference(Constants.KEY_NOTIF_SLIDER_ACTION_TOP,
                 entries, entryValues) &&
-            updateSliderPreference(Constants.NOTIF_SLIDER_ACTION_MIDDLE_KEY,
+            updateSliderPreference(Constants.KEY_NOTIF_SLIDER_ACTION_MIDDLE,
                     entries, entryValues) &&
-            updateSliderPreference(Constants.NOTIF_SLIDER_ACTION_BOTTOM_KEY,
+            updateSliderPreference(Constants.KEY_NOTIF_SLIDER_ACTION_BOTTOM,
                     entries, entryValues);
     }
 
@@ -287,11 +284,11 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
             return false;
         }
 
-        return updateSliderPreferenceValue(Constants.NOTIF_SLIDER_ACTION_TOP_KEY,
+        return updateSliderPreferenceValue(Constants.KEY_NOTIF_SLIDER_ACTION_TOP,
                 defaults[0]) &&
-            updateSliderPreferenceValue(Constants.NOTIF_SLIDER_ACTION_MIDDLE_KEY,
+            updateSliderPreferenceValue(Constants.KEY_NOTIF_SLIDER_ACTION_MIDDLE,
                     defaults[1]) &&
-            updateSliderPreferenceValue(Constants.NOTIF_SLIDER_ACTION_BOTTOM_KEY,
+            updateSliderPreferenceValue(Constants.KEY_NOTIF_SLIDER_ACTION_BOTTOM,
                     defaults[2]);
     }
 
@@ -321,15 +318,15 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
         ListPreference p;
 
         p = (ListPreference) findPreference(
-                Constants.NOTIF_SLIDER_ACTION_TOP_KEY);
+                Constants.KEY_NOTIF_SLIDER_ACTION_TOP);
         actions[0] = Integer.parseInt(p.getValue());
 
         p = (ListPreference) findPreference(
-                Constants.NOTIF_SLIDER_ACTION_MIDDLE_KEY);
+                Constants.KEY_NOTIF_SLIDER_ACTION_MIDDLE);
         actions[1] = Integer.parseInt(p.getValue());
 
         p = (ListPreference) findPreference(
-                Constants.NOTIF_SLIDER_ACTION_BOTTOM_KEY);
+                Constants.KEY_NOTIF_SLIDER_ACTION_BOTTOM);
         actions[2] = Integer.parseInt(p.getValue());
 
         return actions;
@@ -343,7 +340,7 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
 
     private boolean notifySliderActionChange(int index, String value) {
         ListPreference p = (ListPreference) findPreference(
-                Constants.NOTIF_SLIDER_USAGE_KEY);
+                Constants.KEY_NOTIF_SLIDER_USAGE);
         int usage = Integer.parseInt(p.getValue());
 
         int[] actions = getCurrentSliderActions();
@@ -369,7 +366,7 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
         SharedPreferences prefs = context.getSharedPreferences(
                 context.getPackageName() + "_preferences", Context.MODE_PRIVATE);
 
-        String usage = prefs.getString(Constants.NOTIF_SLIDER_USAGE_KEY,
+        String usage = prefs.getString(Constants.KEY_NOTIF_SLIDER_USAGE,
                 res.getString(R.string.config_defaultNotificationSliderUsage));
 
         int defaultsResId = getDefaultResIdForUsage(usage);
@@ -383,19 +380,19 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
         }
 
         String actionTop = prefs.getString(
-                Constants.NOTIF_SLIDER_ACTION_TOP_KEY, defaults[0]);
+                Constants.KEY_NOTIF_SLIDER_ACTION_TOP, defaults[0]);
 
         String actionMiddle = prefs.getString(
-                Constants.NOTIF_SLIDER_ACTION_MIDDLE_KEY, defaults[1]);
+                Constants.KEY_NOTIF_SLIDER_ACTION_MIDDLE, defaults[1]);
 
         String actionBottom = prefs.getString(
-                Constants.NOTIF_SLIDER_ACTION_BOTTOM_KEY, defaults[2]);
+                Constants.KEY_NOTIF_SLIDER_ACTION_BOTTOM, defaults[2]);
 
         prefs.edit()
-            .putString(Constants.NOTIF_SLIDER_USAGE_KEY, usage)
-            .putString(Constants.NOTIF_SLIDER_ACTION_TOP_KEY, actionTop)
-            .putString(Constants.NOTIF_SLIDER_ACTION_MIDDLE_KEY, actionMiddle)
-            .putString(Constants.NOTIF_SLIDER_ACTION_BOTTOM_KEY, actionBottom)
+            .putString(Constants.KEY_NOTIF_SLIDER_USAGE, usage)
+            .putString(Constants.KEY_NOTIF_SLIDER_ACTION_TOP, actionTop)
+            .putString(Constants.KEY_NOTIF_SLIDER_ACTION_MIDDLE, actionMiddle)
+            .putString(Constants.KEY_NOTIF_SLIDER_ACTION_BOTTOM, actionBottom)
             .commit();
 
         sendUpdateBroadcast(context, Integer.parseInt(usage), new int[] {
@@ -415,11 +412,11 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
     // }
 
     public static void restoreOnePulsePwmSetting(Context context) {
-        if (Utils.fileWritable(FILE_PWM)) {
+        if (Utils.fileWritable(Constants.NODE_ONEPULSE_PWM)) {
             SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
-            boolean value = sharedPrefs.getBoolean(KEY_ONEPULSE_PWM,
-                Utils.getFileValueAsBoolean(FILE_PWM, false));
-            Utils.writeValue(FILE_PWM, value ? "1" : "0");
+            boolean value = sharedPrefs.getBoolean(Constants.KEY_ONEPULSE_PWM,
+                Utils.getFileValueAsBoolean(Constants.NODE_ONEPULSE_PWM, false));
+            Utils.writeValue(Constants.NODE_ONEPULSE_PWM, value ? "1" : "0");
         }
     }
 

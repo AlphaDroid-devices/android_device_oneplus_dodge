@@ -21,11 +21,11 @@ import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.TwoStatePreference;
 
+import org.lineageos.device.settings.Constants;
 import org.lineageos.device.settings.R;
+import org.lineageos.device.settings.preferences.CustomSeekBarPreference;
 
 public class BypassChargingFragment extends PreferenceFragmentCompat {
-
-    private static final String KEY_BYPASS_CHARGING = "bypass_charging";
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -35,16 +35,33 @@ public class BypassChargingFragment extends PreferenceFragmentCompat {
                 BypassChargingController.getInstance(getContext());
         boolean bypassSupported = bypassController.isBypassChargingSupported();
 
-        TwoStatePreference bypassPreference = findPreference(KEY_BYPASS_CHARGING);
-        bypassPreference.setEnabled(bypassSupported);
-        if (bypassSupported) {
-            bypassPreference.setChecked(bypassController.isBypassChargingEnabled());
-            bypassPreference.setOnPreferenceChangeListener((pref, newValue) -> {
-                bypassController.setBypassCharging((boolean) newValue);
-                return true;
-            });
-        } else {
-            bypassPreference.setSummary(R.string.bypass_charging_unavailable);
+        TwoStatePreference bypassPreference = findPreference(Constants.KEY_BYPASS_CHARGING);
+        if (bypassPreference != null) {
+            bypassPreference.setEnabled(bypassSupported);
+            if (bypassSupported) {
+                bypassPreference.setChecked(bypassController.getBypassChargingStatus() != Constants.BYPASS_OFF);
+                bypassPreference.setOnPreferenceChangeListener((pref, newValue) -> {
+                    boolean enable = (boolean) newValue;
+                    if (enable) {
+                        bypassController.enableBypassCharging();
+                    }
+                    else {
+                        bypassController.disableBypassCharging();
+                    }
+                    return true;
+                });
+            } else {
+                bypassPreference.setSummary(R.string.bypass_charging_unavailable);
+            }
+        }
+
+        CustomSeekBarPreference targetPreference = findPreference(Constants.KEY_BYPASS_CHARGING_TARGET);
+        if (targetPreference != null) {
+            targetPreference.setValue(bypassController.getBypassChargingTarget());
+            targetPreference.setOnPreferenceChangeListener((pref, newValue) -> {
+                    bypassController.setBypassChargingTarget((int) newValue);
+                    return true;
+                });
         }
     }
 }

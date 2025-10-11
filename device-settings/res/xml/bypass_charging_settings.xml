@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:settings="http://schemas.android.com/apk/res-auto">
 
     <PreferenceCategory
         android:key="bypass_charging_category"
@@ -11,6 +12,19 @@
             android:icon="@drawable/ic_bypass_charging"
             android:summary="@string/bypass_charging_summary"
             android:persistent="false" />
+
+        <org.lineageos.device.settings.preferences.CustomSeekBarPreference
+            android:key="bypass_charging_target"
+            android:title="@string/bypass_charging_target_title"
+            android:summary="@string/bypass_charging_target_summary"
+            android:icon="@drawable/ic_bypass_waiting"
+            android:dependency="bypass_charging"
+            android:defaultValue="0"
+            android:max="100"
+            settings:min="0"
+            settings:interval="5"
+            settings:units="%"
+            settings:showSign="true" />
 
         <com.android.settingslib.widget.FooterPreference
             android:key="bypass_charging_info"

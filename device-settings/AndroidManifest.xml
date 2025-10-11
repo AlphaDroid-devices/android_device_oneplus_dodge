@@ -110,6 +110,12 @@
                 android:resource="@string/bypass_charging_summary" />
         </activity>
 
+        <!-- BypassCharging service to monitor battery level -->
+        <service
+            android:name=".bypasschrg.BypassChargingService"
+            android:exported="true"
+            android:foregroundServiceType="connectedDevice" />
+
         <!-- BypassChargingTile service -->
         <service
             android:name=".bypasschrg.BypassChargingTile"

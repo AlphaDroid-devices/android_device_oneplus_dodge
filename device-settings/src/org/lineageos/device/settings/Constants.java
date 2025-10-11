@@ -29,14 +29,14 @@ import android.media.AudioManager;
 
 public class Constants {
 
-    public static final String SLIDER_STATE
-            = "/proc/tristatekey/tri_state";
+    /* Alert Slider */
+    public static final String NODE_SLIDER_STATE = "/proc/tristatekey/tri_state";
 
-    public static final String NOTIF_SLIDER_PANEL_KEY = "notification_slider";
-    public static final String NOTIF_SLIDER_USAGE_KEY = "slider_usage";
-    public static final String NOTIF_SLIDER_ACTION_TOP_KEY = "action_top_position";
-    public static final String NOTIF_SLIDER_ACTION_MIDDLE_KEY = "action_middle_position";
-    public static final String NOTIF_SLIDER_ACTION_BOTTOM_KEY = "action_bottom_position";
+    public static final String KEY_NOTIF_SLIDER_PANEL = "notification_slider";
+    public static final String KEY_NOTIF_SLIDER_USAGE = "slider_usage";
+    public static final String KEY_NOTIF_SLIDER_ACTION_TOP = "action_top_position";
+    public static final String KEY_NOTIF_SLIDER_ACTION_MIDDLE = "action_middle_position";
+    public static final String KEY_NOTIF_SLIDER_ACTION_BOTTOM = "action_bottom_position";
 
     public static final String EXTRA_SLIDER_USAGE = "usage";
     public static final String EXTRA_SLIDER_ACTIONS = "actions";
@@ -76,4 +76,17 @@ public class Constants {
     // Holds <preference_key> -> <proc_node> mapping
     public static final Map<String, String> sBooleanNodePreferenceMap = new HashMap<>();
     public static final Map<String, String> sStringNodePreferenceMap = new HashMap<>();
+
+    /* OnePulse PWM */
+    public static final String NODE_ONEPULSE_PWM = "/sys/kernel/oplus_display/pwm_onepulse";
+    public static final String KEY_ONEPULSE_PWM = "onepulse_pwm";
+
+    /* Bypass Charging */
+    public static final String NODE_BYPASS_CHARGING = "/sys/class/oplus_chg/battery/mmi_charging_enable";
+    public static final String KEY_BYPASS_CHARGING = "bypass_charging";
+    public static final String KEY_BYPASS_CHARGING_TARGET = "bypass_charging_target";
+
+    public static final int BYPASS_OFF = 0;
+    public static final int BYPASS_WAITING = 1;
+    public static final int BYPASS_ON = 2;
 }

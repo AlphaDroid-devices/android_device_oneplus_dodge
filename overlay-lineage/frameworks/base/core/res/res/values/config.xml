@@ -16,4 +16,7 @@
         <item>org.lineageos.device.DeviceSettings.KeyHandler</item>
         <item>com.android.settings.lineage.gestures.KeyHandler</item>
     </string-array>
+
+    <!-- Lineage Health -->
+    <bool name="config_supportsChargingControl">false</bool>
 </resources>

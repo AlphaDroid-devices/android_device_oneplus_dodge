@@ -79,7 +79,7 @@ public abstract class SliderControllerBase {
         }
 
         try {
-            int state = Integer.parseInt(FileUtils.readOneLine(Constants.SLIDER_STATE).trim());
+            int state = Integer.parseInt(FileUtils.readOneLine(Constants.NODE_SLIDER_STATE).trim());
             ret = processAction(mActions[state - 1]);
             if (ret > 0 && notify) {
                 sendUpdateBroadcast(context, state - 1, ret);

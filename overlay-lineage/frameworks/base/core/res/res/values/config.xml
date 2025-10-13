@@ -13,7 +13,7 @@
 
     <!-- Names of the key handler classes -->
     <string-array name="config_deviceKeyHandlerClasses" translatable="false">
-        <item>org.lineageos.device.DeviceSettings.KeyHandler</item>
+        <item>org.lineageos.device.settings.KeyHandler</item>
         <item>com.android.settings.lineage.gestures.KeyHandler</item>
     </string-array>
 

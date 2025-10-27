@@ -32,6 +32,8 @@ import org.lineageos.device.settings.bypasschrg.BypassChargingActivity;
 import org.lineageos.device.settings.bypasschrg.BypassChargingTile;
 import org.lineageos.device.settings.gamebar.GameBarSettingsActivity;
 import org.lineageos.device.settings.gamebar.GameBarTileService;
+import org.lineageos.device.settings.display.HbmTile;
+import org.lineageos.device.settings.display.PwmTile;
 
 public final class TileHandlerActivity extends Activity {
     private static final String TAG = "TileHandlerActivity";
@@ -42,6 +44,8 @@ public final class TileHandlerActivity extends Activity {
     static {
         TILE_ACTIVITY_MAP.put(GameBarTileService.class.getName(), GameBarSettingsActivity.class);
         TILE_ACTIVITY_MAP.put(BypassChargingTile.class.getName(), BypassChargingActivity.class);
+        TILE_ACTIVITY_MAP.put(HbmTile.class.getName(), DeviceSettings.class);
+        TILE_ACTIVITY_MAP.put(PwmTile.class.getName(), DeviceSettings.class);
     }
 
     @Override
@@ -68,7 +72,7 @@ public final class TileHandlerActivity extends Activity {
         // Check if the tile is mapped to an activity
         if (TILE_ACTIVITY_MAP.containsKey(qsName)) {
             targetIntent.setClass(this, TILE_ACTIVITY_MAP.get(qsName));
-            Log.d(TAG, "Launching settings activity for QS tile: " + qsName);
+            Log.i(TAG, "Launching settings activity for QS tile: " + qsName);
         } else {
             // Default: Open app settings for the QS tile's package
             final String packageName = qsTile.getPackageName();
@@ -79,7 +83,7 @@ public final class TileHandlerActivity extends Activity {
             }
             targetIntent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
             targetIntent.setData(Uri.fromParts("package", packageName, null));
-            Log.d(TAG, "Opening app info for package: " + packageName);
+            Log.i(TAG, "Opening app info for package: " + packageName);
         }
 
         // Ensure proper navigation behavior

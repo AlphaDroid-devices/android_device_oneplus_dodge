@@ -43,7 +43,7 @@ public final class BrightnessController extends SliderControllerBase {
 
     @Override
     protected int processAction(int action) {
-        Log.d(TAG, "slider action: " + action);
+        Log.i(TAG, "slider action: " + action);
         switch (action) {
             case BRIGHTNESS_AUTO:
                 if (writeSettings(Settings.System.SCREEN_BRIGHTNESS_MODE,

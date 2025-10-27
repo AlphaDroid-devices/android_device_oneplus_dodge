@@ -22,11 +22,13 @@ import android.content.Intent;
 import android.content.res.Resources;
 import android.os.Bundle;
 import android.os.UserHandle;
-import android.os.Vibrator;
-import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.MenuItem;
+import android.widget.FrameLayout;
+import android.widget.CheckBox;
+
+import androidx.appcompat.app.AlertDialog;
 import androidx.preference.ListPreference;
 import androidx.preference.PreferenceGroup;
 import androidx.preference.PreferenceManager;
@@ -38,6 +40,8 @@ import com.android.settingslib.widget.SettingsBasePreferenceFragment;
 import java.util.Arrays;
 
 import org.lineageos.device.settings.Constants;
+import org.lineageos.device.settings.display.HbmController;
+import org.lineageos.device.settings.display.PwmController;
 import org.lineageos.internal.util.FileUtils;
 
 public class DeviceSettings extends SettingsBasePreferenceFragment
@@ -54,6 +58,8 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
     //
     // private static final String FILE_FAST_CHARGE = "/sys/module/oplus_chg/parameters/force_fast_charge";
 
+    private static final String KEY_SHOW_HBM_WARNING = "hbm_warning";
+
     private ListPreference mTopKeyPref;
     private ListPreference mMiddleKeyPref;
     private ListPreference mBottomKeyPref;
@@ -62,12 +68,17 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
     // private SwitchPreferenceCompat mEdgeTouchSwitch;
     // private SwitchPreferenceCompat mUSB2FastChargeModeSwitch;
     private SwitchPreferenceCompat mOnePulsePWMSwitch;
+    private SwitchPreferenceCompat mHbmSwitch;
+
+    private HbmController mHbmController;
+    private PwmController mPwmController;
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
         addPreferencesFromResource(R.xml.main);
 
-        SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(getContext());
+        mHbmController = HbmController.getInstance(getContext());
+        mPwmController = PwmController.getInstance(getContext());
 
         // mGameModeSwitch = (SwitchPreferenceCompat) findPreference(KEY_GAME_SWITCH);
         // if (Utils.fileWritable(FILE_GAME)) {
@@ -102,14 +113,48 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
         mOnePulsePWMSwitch = (SwitchPreferenceCompat) findPreference(Constants.KEY_ONEPULSE_PWM);
         if (Utils.fileWritable(Constants.NODE_ONEPULSE_PWM)) {
             mOnePulsePWMSwitch.setEnabled(true);
-            mOnePulsePWMSwitch.setChecked(sharedPrefs.getBoolean(Constants.KEY_ONEPULSE_PWM,
-                Utils.getFileValueAsBoolean(Constants.NODE_ONEPULSE_PWM, false)));
+            mOnePulsePWMSwitch.setChecked(mPwmController.isPwmEnabled());
             mOnePulsePWMSwitch.setOnPreferenceChangeListener(this);
         } else {
             mOnePulsePWMSwitch.setEnabled(false);
         }
 
+        mHbmSwitch = (SwitchPreferenceCompat) findPreference(Constants.KEY_HBM);
+        if (Utils.fileWritable(Constants.NODE_HBM)) {
+            mHbmSwitch.setEnabled(true);
+            mHbmSwitch.setChecked(mHbmController.isHbmEnabled());
+            mHbmSwitch.setOnPreferenceChangeListener(this);
+        } else {
+            mHbmSwitch.setEnabled(false);
+        }
+
+        // Sync UI state: PWM has priority over HBM
+        syncHbmPwmState();
+
         initNotificationSliderPreference();
+    }
+
+    private void syncHbmPwmState() {
+        if (mOnePulsePWMSwitch == null || mHbmSwitch == null) {
+            return;
+        }
+
+        boolean pwmEnabled = mPwmController.isPwmEnabled();
+        boolean hbmEnabled = mHbmController.isHbmEnabled();
+
+        // PWM has priority: if PWM is enabled, disable HBM
+        if (pwmEnabled && hbmEnabled) {
+            Log.i(TAG, "PWM is enabled, disabling HBM (PWM has priority)");
+            mHbmSwitch.setChecked(false);
+            mHbmController.disableHbm();
+            hbmEnabled = false;
+        }
+
+        // Update UI availability
+        // HBM cannot be enabled if PWM is enabled
+        mHbmSwitch.setEnabled(!pwmEnabled);
+        // PWM cannot be enabled if HBM is enabled
+        mOnePulsePWMSwitch.setEnabled(!hbmEnabled);
     }
 
     private void initNotificationSliderPreference() {
@@ -130,30 +175,69 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
 
     @Override
     public boolean onPreferenceChange(Preference preference, Object newValue) {
+        SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(getContext());
+
         // if (preference == mGameModeSwitch) {
         //     boolean enabled = (Boolean) newValue;
-        //     SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(getContext());
-        //     sharedPrefs.edit().putBoolean(KEY_GAME_SWITCH, enabled).commit();
+        //     sharedPrefs.edit().putBoolean(KEY_GAME_SWITCH, enabled).apply();
     	   //  Utils.writeValue(FILE_GAME, enabled ? "1" : "0");
         //     return true;
         // } else if (preference == mEdgeTouchSwitch) {
         //     boolean enabled = (Boolean) newValue;
-        //     SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(getContext());
-        //     sharedPrefs.edit().putBoolean(KEY_EDGE_TOUCH, enabled).commit();
+        //     sharedPrefs.edit().putBoolean(KEY_EDGE_TOUCH, enabled).apply();
     	   //  Utils.writeValue(FILE_EDGE, enabled ? "1" : "0");
         //     return true;
         // } else if (preference == mUSB2FastChargeModeSwitch) {
         //     boolean enabled = (Boolean) newValue;
-        //     SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(getContext());
-        //     sharedPrefs.edit().putBoolean(KEY_USB2_SWITCH, enabled).commit();
+        //     sharedPrefs.edit().putBoolean(KEY_USB2_SWITCH, enabled).apply();
     	   //  Utils.writeValue(FILE_FAST_CHARGE, enabled ? "1" : "0");
         //     return true;
         // }
+
         if (preference == mOnePulsePWMSwitch) {
             boolean enabled = (Boolean) newValue;
-            SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(getContext());
-            sharedPrefs.edit().putBoolean(Constants.KEY_ONEPULSE_PWM, enabled).commit();
-            Utils.writeValue(Constants.NODE_ONEPULSE_PWM, enabled ? "1" : "0");
+
+            if (enabled) {
+                if (!mPwmController.enablePwm()) {
+                    return false;
+                }
+                Log.i(TAG, "PWM enabled, disabling HBM");
+                mHbmSwitch.setChecked(false);
+                mHbmSwitch.setEnabled(false);
+            } else {
+                if (!mPwmController.disablePwm()) {
+                    return false;
+                }
+                mHbmSwitch.setEnabled(true);
+            }
+            return true;
+        } else if (preference == mHbmSwitch) {
+            boolean enabled = (Boolean) newValue;
+
+            // HBM cannot be enabled if PWM is active
+            if (enabled && mPwmController.isPwmEnabled()) {
+                Log.i(TAG, "Cannot enable HBM while PWM is active");
+                mHbmSwitch.setChecked(false);
+                return false;
+            }
+
+            if (enabled && sharedPrefs.getBoolean(KEY_SHOW_HBM_WARNING, true)) {
+                showHbmWarningDialog();
+            } else {
+                if (enabled) {
+                    if (!mHbmController.enableHbm()) {
+                        mHbmSwitch.setChecked(false);
+                        return false;
+                    }
+                    mOnePulsePWMSwitch.setEnabled(false);
+                } else {
+                    if (!mHbmController.disableHbm()) {
+                        mHbmSwitch.setChecked(true);
+                        return false;
+                    }
+                    mOnePulsePWMSwitch.setEnabled(true);
+                }
+            }
             return true;
         }
 
@@ -186,6 +270,47 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
         }
 
         return false;
+    }
+
+    private void showHbmWarningDialog() {
+        // Create a custom view with checkbox for "Don't show again"
+        android.widget.LinearLayout container = new android.widget.LinearLayout(getActivity());
+        container.setOrientation(android.widget.LinearLayout.VERTICAL);
+
+        android.widget.CheckBox dontShowAgain = new android.widget.CheckBox(getActivity());
+        dontShowAgain.setText(R.string.hbm_warning_dont_show_again);
+
+        android.widget.LinearLayout.LayoutParams params = new android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.setMargins(48, 12, 0, 12);
+        dontShowAgain.setLayoutParams(params);
+
+        container.addView(dontShowAgain);
+
+        new AlertDialog.Builder(getActivity())
+                .setTitle(R.string.hbm_warning_title)
+                .setIcon(android.R.drawable.ic_dialog_alert)
+                .setMessage(R.string.hbm_warning_summary)
+                .setView(container)
+                .setPositiveButton(R.string.hbm_btn_enable, (dialog, which) -> {
+                        if (dontShowAgain.isChecked()) {
+                            SharedPreferences sharedPrefs =
+                                    PreferenceManager.getDefaultSharedPreferences(getContext());
+                            sharedPrefs.edit().putBoolean(KEY_SHOW_HBM_WARNING, false).apply();
+                        }
+                        if (mHbmController.enableHbm()) {
+                            mOnePulsePWMSwitch.setEnabled(false);
+                        } else {
+                            mHbmSwitch.setChecked(false);
+                        }
+                    })
+                .setNegativeButton(android.R.string.cancel, (dialog, which) -> {
+                        mHbmSwitch.setChecked(false);
+                        mOnePulsePWMSwitch.setEnabled(true);
+                    })
+                .setCancelable(false)
+                .show();
     }
 
     @Override
@@ -357,7 +482,7 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
         intent.putExtra(Constants.EXTRA_SLIDER_ACTIONS, actions);
         intent.setFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY);
         context.sendBroadcastAsUser(intent, UserHandle.CURRENT);
-        Log.d(TAG, "update slider usage " + usage + " with actions: " +
+        Log.i(TAG, "update slider usage " + usage + " with actions: " +
                 Arrays.toString(actions));
     }
 
@@ -413,10 +538,10 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
 
     public static void restoreOnePulsePwmSetting(Context context) {
         if (Utils.fileWritable(Constants.NODE_ONEPULSE_PWM)) {
-            SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
-            boolean value = sharedPrefs.getBoolean(Constants.KEY_ONEPULSE_PWM,
-                Utils.getFileValueAsBoolean(Constants.NODE_ONEPULSE_PWM, false));
-            Utils.writeValue(Constants.NODE_ONEPULSE_PWM, value ? "1" : "0");
+            PwmController pwmController = PwmController.getInstance(context);
+            if (pwmController.isPwmEnabled()) {
+                pwmController.enablePwm();
+            }
         }
     }
 

@@ -43,8 +43,7 @@
 
         <receiver android:name=".BootCompletedReceiver"
             android:exported="true"
-            android:enabled="true"
-            android:permission="android.permission.RECEIVE_BOOT_COMPLETED">
+            android:enabled="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
@@ -90,7 +89,7 @@
         <!-- Search Provider -->
         <provider
             android:name=".ConfigPanelSearchIndexablesProvider"
-            android:authorities="org.lineageos.device"
+            android:authorities="org.lineageos.device.settings.provider"
             android:multiprocess="false"
             android:grantUriPermissions="true"
             android:permission="android.permission.READ_SEARCH_INDEXABLES"
@@ -110,13 +109,12 @@
                 android:resource="@string/bypass_charging_summary" />
         </activity>
 
-        <!-- BypassCharging service to monitor battery level -->
+        <!-- Bypass charging manager -->
         <service
-            android:name=".bypasschrg.BypassChargingService"
-            android:exported="true"
-            android:foregroundServiceType="connectedDevice" />
+            android:name=".bypasschrg.BypassChargingManager"
+            android:exported="false" />
 
-        <!-- BypassChargingTile service -->
+        <!-- BypassCharging QS Tile -->
         <service
             android:name=".bypasschrg.BypassChargingTile"
             android:label="@string/bypass_charging_title"
@@ -153,10 +151,6 @@
                 android:resource="@string/game_bar_summary" />
         </activity>
 
-        <!-- GameBar AppSelector -->
-        <activity android:name=".gamebar.GameBarAppSelectorActivity" />
-        <activity android:name=".gamebar.GameBarAppRemoverActivity" />
-
         <!-- GameBar Overlay Tile Service -->
         <service
             android:name=".gamebar.GameBarTileService"
@@ -175,6 +169,46 @@
         <!-- GameBar Overlay Monitor Service -->
         <service
             android:name=".gamebar.GameBarMonitorService"
+            android:exported="false" />
+
+        <!-- HBM Quick Settings Tile -->
+        <service
+            android:name="org.lineageos.device.settings.display.HbmTile"
+            android:label="@string/hbm_title"
+            android:icon="@drawable/ic_hbm"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- PWM Quick Settings Tile -->
+        <service
+            android:name="org.lineageos.device.settings.display.PwmTile"
+            android:label="@string/onepulse_pwm_mode_title"
+            android:icon="@drawable/ic_pwm"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Refresh rate activity -->
+        <activity android:name=".refreshrate.RefreshRateActivity"
+            android:label="@string/refresh_rate_title"
+            android:theme="@style/Theme.SubSettingsBase.Expressive"
+            android:exported="true">
+            <meta-data
+                android:name="com.android.settings.summary"
+                android:resource="@string/refresh_rate_summary" />
+        </activity>
+
+        <!-- Refresh Rate Monitor Service -->
+        <service
+            android:name=".refreshrate.RefreshRateMonitorService"
+            android:enabled="true"
             android:exported="false" />
     </application>
 </manifest>

@@ -18,18 +18,26 @@
             android:title="@string/bypass_charging_target_title"
             android:summary="@string/bypass_charging_target_summary"
             android:icon="@drawable/ic_bypass_waiting"
-            android:dependency="bypass_charging"
-            android:defaultValue="0"
-            android:max="100"
-            settings:min="0"
-            settings:interval="5"
+            android:defaultValue="1"
+            android:max="99"
+            settings:min="1"
+            settings:interval="1"
             settings:units="%"
             settings:showSign="true" />
-
-        <com.android.settingslib.widget.FooterPreference
-            android:key="bypass_charging_info"
-            android:title="@string/bypass_charging_info_title"
-            android:selectable="false" />
-
     </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/bypass_charging_app_picker_title"
+        android:key="bypass_charging_applications">
+        <Preference
+            android:key="bypass_charging_add_packages"
+            android:icon="@drawable/ic_add"
+            android:title="@string/add_bypass_charging_package_title" />
+    </PreferenceCategory>
+
+    <com.android.settingslib.widget.FooterPreference
+        android:key="bypass_charging_info"
+        android:title="@string/bypass_charging_info_title"
+        android:selectable="false" />
+
 </PreferenceScreen>

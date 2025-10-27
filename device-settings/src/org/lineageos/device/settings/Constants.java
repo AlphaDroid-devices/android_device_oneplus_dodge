@@ -29,6 +29,9 @@ import android.media.AudioManager;
 
 public class Constants {
 
+    /* Debug flag */
+    public static final boolean DEBUG = true;
+
     /* Alert Slider */
     public static final String NODE_SLIDER_STATE = "/proc/tristatekey/tri_state";
 
@@ -77,6 +80,9 @@ public class Constants {
     public static final Map<String, String> sBooleanNodePreferenceMap = new HashMap<>();
     public static final Map<String, String> sStringNodePreferenceMap = new HashMap<>();
 
+    /* GameBar */
+    public static final String KEY_GAMEBAR_AUTO_APPS = "game_bar_auto_apps";
+
     /* OnePulse PWM */
     public static final String NODE_ONEPULSE_PWM = "/sys/kernel/oplus_display/pwm_onepulse";
     public static final String KEY_ONEPULSE_PWM = "onepulse_pwm";
@@ -85,8 +91,23 @@ public class Constants {
     public static final String NODE_BYPASS_CHARGING = "/sys/class/oplus_chg/battery/mmi_charging_enable";
     public static final String KEY_BYPASS_CHARGING = "bypass_charging";
     public static final String KEY_BYPASS_CHARGING_TARGET = "bypass_charging_target";
+    public static final String KEY_BYPASS_CHARGING_APPS = "bypass_charging_apps";
 
     public static final int BYPASS_OFF = 0;
     public static final int BYPASS_WAITING = 1;
     public static final int BYPASS_ON = 2;
+
+    public static final int BYPASS_TARGET_MIN = 1;
+    public static final int BYPASS_TARGET_MAX = 99;
+    public static final int BYPASS_TARGET_DEFAULT = BYPASS_TARGET_MIN;
+
+    /* HBM */
+    public static final String NODE_HBM = "/sys/kernel/oplus_display/hbm_max";
+    public static final String KEY_HBM = "hbm_max";
+
+    /** Refresh rate */
+    public static final String KEY_REFRESH_RATE_MODE = "refresh_rate_mode";
+    /** SharedPreferences key for per-app refresh rate overrides (pipe-separated "pkg:fps|pkg:fps") */
+    public static final String KEY_REFRESH_RATE_APPS = "refresh_rate_apps";
+    public static final int REFRESH_RATE_DEFAULT = 60;
 }

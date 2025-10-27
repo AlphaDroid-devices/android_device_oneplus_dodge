@@ -54,7 +54,7 @@ public final class NotificationRingerController extends SliderControllerBase {
 
     @Override
     protected int processAction(int action) {
-        Log.d(TAG, "slider action: " + action);
+        Log.i(TAG, "slider action: " + action);
 
         switch (action) {
             case RINGER_VIBRATE:

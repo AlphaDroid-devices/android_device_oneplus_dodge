@@ -67,7 +67,7 @@ public abstract class SliderControllerBase {
         intent.putExtra(Constants.EXTRA_SLIDER_POSITION_VALUE, result);
         context.sendBroadcastAsUser(intent, UserHandle.CURRENT);
         intent.setFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY);
-        Log.d(TAG, "slider change to positon " + position);
+        Log.i(TAG, "slider change to positon " + position);
     }
 
     public abstract void reset();

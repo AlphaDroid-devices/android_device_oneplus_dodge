@@ -67,7 +67,7 @@ public final class FlashlightController extends SliderControllerBase {
 
     @Override
     protected int processAction(int action) {
-        Log.d(TAG, "slider action: " + action);
+        Log.i(TAG, "slider action: " + action);
         boolean succeed;
         switch (action) {
             case FLASHLIGHT_OFF:

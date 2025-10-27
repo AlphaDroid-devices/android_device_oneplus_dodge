@@ -1,181 +1,362 @@
 /*
- * Copyright (C) 2025 The LineageOS Project
- * Copyright (C) 2025 AlphaDroid
+ * SPDX-FileCopyrightText: 2025 AlphaDroid
+ * SPDX-License-Identifier: Apache-2.0
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Pure state machine for bypass charging logic.
+ * No UI concerns, no service management, just state.
  */
 
 package org.lineageos.device.settings.bypasschrg;
 
-import android.content.ContentResolver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.BatteryManager;
+import android.text.TextUtils;
 import android.util.Log;
-import android.widget.Toast;
+
 import androidx.preference.PreferenceManager;
 
 import org.lineageos.device.settings.Constants;
-import org.lineageos.device.settings.R;
 import org.lineageos.device.settings.utils.FileUtils;
+
+import java.util.Objects;
 
 public class BypassChargingController {
 
-    private static final boolean DEBUG = true;
     private static final String TAG = "BypassChargingController";
-    private static final String BYPASS_CHARGING_ENABLED = "0";
-    private static final String BYPASS_CHARGING_DISABLED = "1";
+    private static final String BYPASS_ENABLED = "0";
+    private static final String BYPASS_DISABLED = "1";
     private static final String KEY_BATTERY_LEVEL = "current_battery_level";
 
     private int mBatteryLevel;
-
-    private Context mContext;
-    private ContentResolver mContentResolver;
+    private final Context mContext;
     private final Object mLock = new Object();
 
     private static BypassChargingController sInstance;
+
+    // Transient app-specific state (not persisted)
+    private String mActiveApp = null;
+
+    public static final class BypassState {
+        public final int globalStatus;     // BYPASS_OFF / WAITING / ON
+        public final String activeApp;     // nullable
+        public final int targetLevel;
+        public final int currentLevel;
+
+        public BypassState(int globalStatus, String activeApp, int targetLevel, int currentLevel) {
+            this.globalStatus = globalStatus;
+            this.activeApp = activeApp;
+            this.targetLevel = targetLevel;
+            this.currentLevel = currentLevel;
+        }
+
+        @Override
+        public String toString() {
+            return "BypassState{" +
+                    "global=" + globalStatus +
+                    ", app=" + activeApp +
+                    ", level=" + currentLevel + "/" + targetLevel +
+                    "}";
+        }
+    }
+
     public static synchronized BypassChargingController getInstance(Context context) {
         if (sInstance == null) {
-            sInstance = new BypassChargingController(context);
+            sInstance = new BypassChargingController(context.getApplicationContext());
         }
         return sInstance;
     }
 
     private BypassChargingController(Context context) {
         mContext = context.getApplicationContext();
-        mContentResolver = mContext.getContentResolver();
         mBatteryLevel = getLevelFromIntent();
         if (isValidLevel(mBatteryLevel)) {
             saveCurrentBatteryLevel(mBatteryLevel);
         }
     }
 
-    // Called from Service when battery level changes
-    public void onBatteryLevelChanged(int level) {
-        synchronized (mLock) {
-            if (isValidLevel(level) && (mBatteryLevel == -1 || mBatteryLevel != level)) {
-                mBatteryLevel = level;
-                saveCurrentBatteryLevel(level);
-                maybeEnableBypassCharging();
-                if (DEBUG) Log.d(TAG, "Battery level changed (service): " + level + "%");
-            }
-        }
-    }
+    // ===== Battery helpers =====
 
-    // get battery level using a sticky intent
     private int getLevelFromIntent() {
-        android.content.IntentFilter filter =
-                new android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED);
-        android.content.Intent intent = mContext.registerReceiver(null, filter);
-
+        IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        Intent intent = mContext.registerReceiver(null, filter);
         if (intent == null) {
-            if (DEBUG) Log.w(TAG, "Sticky battery intent was null");
+            if (Constants.DEBUG) Log.w(TAG, "Battery intent null");
             return -1;
         }
-
-        int extraLevel = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-        int extraScale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
-
-        return (extraLevel >= 0 && extraScale > 0) ?
-                (int)((extraLevel / (float)extraScale) * 100) : -1;
+        int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+        int scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+        return (level >= 0 && scale > 0) ? (int) ((level / (float) scale) * 100) : -1;
     }
 
-    private boolean isNodeAccessible(String node) {
+    private int getPlugTypeFromIntent() {
+        IntentFilter filter = new IntentFilter(Intent.ACTION_BATTERY_CHANGED);
+        Intent intent = mContext.registerReceiver(null, filter);
+        if (intent == null) return 0;
+        return intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0);
+    }
+
+    private boolean isPlugged() {
+        return getPlugTypeFromIntent() != 0;
+    }
+
+    private boolean isValidLevel(int level) {
+        return level >= 0 && level <= 100;
+    }
+
+    // ===== Hardware control =====
+
+    private boolean enableHardwareBypass() {
         try {
-            String status = FileUtils.readOneLine(node);
+            FileUtils.writeLine(Constants.NODE_BYPASS_CHARGING, BYPASS_ENABLED);
+            String verify = FileUtils.readOneLine(Constants.NODE_BYPASS_CHARGING);
+            if (!BYPASS_ENABLED.equals(verify)) {
+                Log.e(TAG, "Hardware bypass enable verification failed");
+                return false;
+            }
+            if (Constants.DEBUG) Log.i(TAG, "Hardware bypass enabled");
             return true;
         } catch (Exception e) {
-            Log.e(TAG, "Node " + node + " not accessible", e);
+            Log.e(TAG, "Failed to enable hardware bypass", e);
             return false;
         }
     }
 
-    private boolean writeToNode(String status) {
-        synchronized (mLock) {
-            try {
-                FileUtils.writeLine(Constants.NODE_BYPASS_CHARGING, status);
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to write bypass sysnode", e);
+    private boolean disableHardwareBypass() {
+        try {
+            FileUtils.writeLine(Constants.NODE_BYPASS_CHARGING, BYPASS_DISABLED);
+            String verify = FileUtils.readOneLine(Constants.NODE_BYPASS_CHARGING);
+            if (!BYPASS_DISABLED.equals(verify)) {
+                Log.e(TAG, "Hardware bypass disable verification failed");
                 return false;
             }
+            if (Constants.DEBUG) Log.i(TAG, "Hardware bypass disabled");
             return true;
-        }
-    }
-
-    private int readFromNode() {
-        synchronized (mLock) {
-            try {
-                String value = FileUtils.readOneLine(Constants.NODE_BYPASS_CHARGING);
-                return Integer.parseInt(value);
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to read bypass sysnode", e);
-                return -1;
-            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to disable hardware bypass", e);
+            return false;
         }
     }
 
     public boolean isBypassChargingSupported() {
-        return isNodeAccessible(Constants.NODE_BYPASS_CHARGING);
-    }
-
-    private void maybeEnableBypassCharging() {
-        if (mBatteryLevel >= getBypassChargingTarget()
-                && getBypassChargingStatus() == Constants.BYPASS_WAITING) {
-            if (writeToNode(BYPASS_CHARGING_ENABLED)) {
-                saveBypassChargingStatus(Constants.BYPASS_ON);
-                BypassChargingService.stop(mContext);
-            }
-        }
-    }
-
-    private void maybeDisableBypassCharging(int target) {
-        if (mBatteryLevel < target
-                && getBypassChargingStatus() == Constants.BYPASS_ON) {
-            if (writeToNode(BYPASS_CHARGING_DISABLED)) {
-                saveBypassChargingStatus(Constants.BYPASS_WAITING);
-                BypassChargingService.start(mContext);
-            }
-        }
-    }
-
-    public boolean enableBypassCharging() {
-        int level = getCurrentBatteryLevel();
-
-        if (!isValidLevel(level)) {
-            if (DEBUG) Log.w(TAG, "Cannot enable bypass: invalid battery level " + level);
+        try {
+            FileUtils.readOneLine(Constants.NODE_BYPASS_CHARGING);
+            return true;
+        } catch (Exception e) {
             return false;
         }
-
-        if (getBypassChargingTarget() > level) {
-            saveBypassChargingStatus(Constants.BYPASS_WAITING);
-            BypassChargingService.start(mContext);
-            return true;
-        }
-        else if (writeToNode(BYPASS_CHARGING_ENABLED)) {
-            saveBypassChargingStatus(Constants.BYPASS_ON);
-            BypassChargingService.stop(mContext);
-            return true;
-        }
-        return false;
     }
+
+    // ===== Power events =====
+
+    public void handlePowerConnected() {
+        synchronized (mLock) {
+            if (Constants.DEBUG) Log.i(TAG, "Power connected");
+
+            mBatteryLevel = getLevelFromIntent();
+            if (isValidLevel(mBatteryLevel)) {
+                saveCurrentBatteryLevel(mBatteryLevel);
+            }
+
+            int status = getBypassChargingStatus();
+            int target = getBypassChargingTarget();
+            int current = getCurrentBatteryLevel();
+
+            if (status == Constants.BYPASS_ON) {
+                if (current >= target) {
+                    enableHardwareBypass();
+                    if (Constants.DEBUG) Log.i(TAG, "Re-enabled global (level >= target)");
+                } else {
+                    disableHardwareBypass();
+                    saveBypassChargingStatus(Constants.BYPASS_WAITING);
+                    if (Constants.DEBUG) Log.i(TAG, "Below target, now WAITING");
+                }
+            } else if (status == Constants.BYPASS_WAITING && current >= target) {
+                if (enableHardwareBypass()) {
+                    saveBypassChargingStatus(Constants.BYPASS_ON);
+                    if (Constants.DEBUG) Log.i(TAG, "Reached target, now ON");
+                }
+            }
+
+            notifyStateChanged();
+        }
+    }
+
+    public void handlePowerDisconnected() {
+        synchronized (mLock) {
+            if (Constants.DEBUG) Log.i(TAG, "Power disconnected");
+            disableHardwareBypass();
+            mActiveApp = null;
+            // Don't modify global prefs
+            notifyStateChanged();
+        }
+    }
+
+    // ===== UI trigger: enable global bypass =====
+
+    public boolean enableBypassCharging() {
+        synchronized (mLock) {
+            int current = getCurrentBatteryLevel();
+            if (!isValidLevel(current)) {
+                Log.w(TAG, "Invalid battery level: " + current);
+                return false;
+            }
+
+            mActiveApp = null;
+            int target = getBypassChargingTarget();
+
+            if (current >= target) {
+                if (enableHardwareBypass()) {
+                    saveBypassChargingStatus(Constants.BYPASS_ON);
+                    if (Constants.DEBUG) Log.i(TAG, "Global enabled immediately");
+                    notifyStateChanged();
+                    return true;
+                }
+                return false;
+            } else {
+                saveBypassChargingStatus(Constants.BYPASS_WAITING);
+                if (Constants.DEBUG) Log.i(TAG, "Global enabled, waiting for target");
+                notifyStateChanged();
+                return true;
+            }
+        }
+    }
+
+    // ===== UI trigger: disable global bypass =====
 
     public boolean disableBypassCharging() {
-        if (writeToNode(BYPASS_CHARGING_DISABLED)) {
+        synchronized (mLock) {
+            disableHardwareBypass();
+            mActiveApp = null;
             saveBypassChargingStatus(Constants.BYPASS_OFF);
-            BypassChargingService.stop(mContext);
+            if (Constants.DEBUG) Log.i(TAG, "Global disabled");
+            notifyStateChanged();
             return true;
         }
-        return false;
     }
+
+    // ===== Manager: app monitoring trigger =====
+
+    public void setActiveApp(String packageName) {
+        synchronized (mLock) {
+            if (getBypassChargingStatus() != Constants.BYPASS_OFF) {
+                if (Constants.DEBUG) Log.w(TAG, "Cannot set app: global bypass is active");
+                return;
+            }
+
+            if (Objects.equals(mActiveApp, packageName)) {
+                return;
+            }
+
+            mActiveApp = packageName;
+            int current = getCurrentBatteryLevel();
+            int target = getBypassChargingTarget();
+
+            if (current >= target) {
+                enableHardwareBypass();
+                if (Constants.DEBUG) Log.i(TAG, "App bypass enabled for " + packageName);
+            } else {
+                disableHardwareBypass();
+                if (Constants.DEBUG) Log.i(TAG, "App bypass waiting for target for " + packageName);
+            }
+
+            notifyStateChanged();
+        }
+    }
+
+    public void clearActiveApp() {
+        synchronized (mLock) {
+            if (mActiveApp == null) return;
+            disableHardwareBypass();
+            mActiveApp = null;
+            if (Constants.DEBUG) Log.i(TAG, "App bypass cleared");
+            notifyStateChanged();
+        }
+    }
+
+    // ===== Battery level update from Manager =====
+
+    public void onBatteryLevelChanged(int level) {
+        synchronized (mLock) {
+            if (!isValidLevel(level)) return;
+
+            if (mBatteryLevel != level) {
+                mBatteryLevel = level;
+                saveCurrentBatteryLevel(level);
+            }
+
+            int status = getBypassChargingStatus();
+            int target = getBypassChargingTarget();
+
+            // Check if global waiting reached target
+            if (status == Constants.BYPASS_WAITING && level >= target) {
+                if (enableHardwareBypass()) {
+                    saveBypassChargingStatus(Constants.BYPASS_ON);
+                    if (Constants.DEBUG) Log.i(TAG, "Global: reached target at " + level + "%");
+                    notifyStateChanged();
+                    return;
+                }
+            }
+
+            // Check if app waiting reached target
+            if (mActiveApp != null && status == Constants.BYPASS_OFF && level >= target) {
+                if (enableHardwareBypass()) {
+                    if (Constants.DEBUG) Log.i(TAG, "App: reached target at " + level + "%");
+                    notifyStateChanged();
+                    return;
+                }
+            }
+
+            notifyStateChanged();
+        }
+    }
+
+    // ===== Target level changes =====
+
+    public void setBypassChargingTarget(int target) {
+        synchronized (mLock) {
+            if (target < Constants.BYPASS_TARGET_MIN || target > Constants.BYPASS_TARGET_MAX) {
+                Log.w(TAG, "Invalid target: " + target);
+                return;
+            }
+
+            int old = getBypassChargingTarget();
+            if (old == target) return;
+
+            saveBypassChargingTarget(target);
+            int status = getBypassChargingStatus();
+            int current = getCurrentBatteryLevel();
+
+            if (status == Constants.BYPASS_ON && current < target) {
+                disableHardwareBypass();
+                saveBypassChargingStatus(Constants.BYPASS_WAITING);
+                if (Constants.DEBUG) Log.i(TAG, "Target raised, now WAITING");
+            } else if (status == Constants.BYPASS_WAITING && current >= target) {
+                if (enableHardwareBypass()) {
+                    saveBypassChargingStatus(Constants.BYPASS_ON);
+                    if (Constants.DEBUG) Log.i(TAG, "Target lowered, now ON");
+                }
+            }
+
+            notifyStateChanged();
+        }
+    }
+
+    // ===== State snapshot =====
+
+    public BypassState getState() {
+        synchronized (mLock) {
+            return new BypassState(
+                    getBypassChargingStatus(),
+                    mActiveApp,
+                    getBypassChargingTarget(),
+                    getCurrentBatteryLevel()
+            );
+        }
+    }
+
+    // ===== Preferences =====
 
     private void saveBypassChargingStatus(int status) {
         PreferenceManager.getDefaultSharedPreferences(mContext)
@@ -189,18 +370,6 @@ public class BypassChargingController {
                 .getInt(Constants.KEY_BYPASS_CHARGING, Constants.BYPASS_OFF);
     }
 
-    public void setBypassChargingTarget(int target) {
-        if (target >= 0 && target <= 100) {
-            saveBypassChargingTarget(target);
-            if (getBypassChargingStatus() == Constants.BYPASS_ON) {
-                maybeDisableBypassCharging(target);
-            }
-            else {
-                maybeEnableBypassCharging();
-            }
-        }
-    }
-
     private void saveBypassChargingTarget(int target) {
         PreferenceManager.getDefaultSharedPreferences(mContext)
                 .edit()
@@ -209,40 +378,41 @@ public class BypassChargingController {
     }
 
     public int getBypassChargingTarget() {
-        return PreferenceManager.getDefaultSharedPreferences(mContext)
-                .getInt(Constants.KEY_BYPASS_CHARGING_TARGET, 0);
+        int target = PreferenceManager.getDefaultSharedPreferences(mContext)
+                .getInt(Constants.KEY_BYPASS_CHARGING_TARGET, Constants.BYPASS_TARGET_DEFAULT);
+        if (target < Constants.BYPASS_TARGET_MIN || target > Constants.BYPASS_TARGET_MAX) {
+            Log.w(TAG, "Invalid target: " + target);
+            saveBypassChargingTarget(Constants.BYPASS_TARGET_DEFAULT);
+            return Constants.BYPASS_TARGET_DEFAULT;
+        }
+        return target;
     }
 
     private void saveCurrentBatteryLevel(int level) {
-        synchronized (mLock) {
-            if (isValidLevel(level)) {
-                PreferenceManager.getDefaultSharedPreferences(mContext)
-                        .edit()
-                        .putInt(KEY_BATTERY_LEVEL, level)
-                        .apply();
-            } else {
-                if (DEBUG) Log.w(TAG, "Attempted to save invalid battery level: " + level);
-            }
+        if (isValidLevel(level)) {
+            PreferenceManager.getDefaultSharedPreferences(mContext)
+                    .edit()
+                    .putInt(KEY_BATTERY_LEVEL, level)
+                    .apply();
         }
     }
 
     public int getCurrentBatteryLevel() {
-        synchronized (mLock) {
-            int level = PreferenceManager.getDefaultSharedPreferences(mContext)
-                    .getInt(KEY_BATTERY_LEVEL, -1);
-            if (!isValidLevel(level)) {
-                if (DEBUG) Log.w(TAG, "Battery level is invalid or not set: " + level);
+        int level = PreferenceManager.getDefaultSharedPreferences(mContext)
+                .getInt(KEY_BATTERY_LEVEL, -1);
+        if (!isValidLevel(level)) {
+            level = getLevelFromIntent();
+            if (isValidLevel(level)) {
+                saveCurrentBatteryLevel(level);
             }
-            return level;
         }
+        return level;
     }
 
-    private boolean isValidLevel(int level) {
-        return level >= 0 && level <= 100;
-    }
+    // ===== Notification =====
 
-    private void showToast(int resId) {
-        Toast.makeText(mContext, mContext.getString(resId),
-                Toast.LENGTH_LONG).show();
+    private void notifyStateChanged() {
+        BypassState state = getState();
+        BypassChargingManager.notifyStateChanged(mContext, state);
     }
 }

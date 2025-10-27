@@ -62,7 +62,7 @@ public final class NotificationController extends SliderControllerBase {
 
     @Override
     protected int processAction(int action) {
-        Log.d(TAG, "slider action: " + action);
+        Log.i(TAG, "slider action: " + action);
         if (MODES.indexOfKey(action) >= 0) {
             mZenMode = MODES.indexOfKey(action);
             mAudioManager.setRingerModeInternal(AudioManager.RINGER_MODE_NORMAL);

@@ -50,7 +50,7 @@ public final class RingerController extends SliderControllerBase {
 
     @Override
     protected int processAction(int action) {
-        Log.d(TAG, "slider action: " + action);
+        Log.i(TAG, "slider action: " + action);
         if (MODES.indexOfKey(action) >= 0) {
             mAudioManager.setRingerModeInternal(MODES.get(action));
             switch (action) {

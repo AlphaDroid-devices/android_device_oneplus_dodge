@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2025 kenway214
+ * Copyright (C) 2025 AlphaDroid
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,17 +17,20 @@
 
 package org.lineageos.device.settings.gamebar;
 
-import android.app.usage.UsageStatsManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.graphics.PixelFormat;
+import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
+import android.text.TextPaint;
 import android.util.TypedValue;
+import android.view.DisplayCutout;
 import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -39,6 +43,7 @@ import android.widget.Toast;
 import androidx.preference.PreferenceManager;
 
 import org.lineageos.device.settings.R;
+import org.lineageos.device.settings.utils.ForegroundAppDetector;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -64,6 +69,15 @@ public class GameBar {
 
     private static final String PREF_KEY_X = "game_bar_x";
     private static final String PREF_KEY_Y = "game_bar_y";
+    private static final String PREF_KEY_DRAGGED_X = "game_bar_dragged_x";
+    private static final String PREF_KEY_DRAGGED_Y = "game_bar_dragged_y";
+
+    // Fixed width constants (in dp)
+    private static final int LABEL_WIDTH_DP     = 60;
+    private static final int VALUE_WIDTH_DP     = 80;
+    private static final int STAT_HEIGHT_DP     = 24;
+    private static final int MINIMAL_VALUE_WIDTH_DP = 40;
+    private static final int DRAG_BOUNDARY_MARGIN_DP = 8;
 
     private final Context mContext;
     private final WindowManager mWindowManager;
@@ -109,6 +123,11 @@ public class GameBar {
     private GradientDrawable mBgDrawable;
 
     private int mItemSpacingDp = 8;
+    private int mScreenWidth = 0;
+    private int mScreenHeight = 0;
+
+    private int initialX, initialY;
+    private float initialTouchX, initialTouchY;
 
     private final Runnable mLongPressRunnable = new Runnable() {
         @Override
@@ -215,6 +234,12 @@ public class GameBar {
 
         applyPreferences();
 
+        // Get screen dimensions
+        android.graphics.Point size = new android.graphics.Point();
+        mWindowManager.getDefaultDisplay().getSize(size);
+        mScreenWidth = size.x;
+        mScreenHeight = size.y;
+
         mLayoutParams = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.WRAP_CONTENT,
@@ -222,6 +247,11 @@ public class GameBar {
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT
         );
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            mLayoutParams.layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+        }
 
         if ("draggable".equals(mPosition)) {
             mDraggable = true;
@@ -277,8 +307,13 @@ public class GameBar {
                     if (mDraggable) {
                         int deltaX = (int) (event.getRawX() - initialTouchX);
                         int deltaY = (int) (event.getRawY() - initialTouchY);
+
                         mLayoutParams.x = initialX + deltaX;
                         mLayoutParams.y = initialY + deltaY;
+
+                        // BOUNDS CHECKING - prevents dragging off-screen
+                        enforceOverlayBounds();
+
                         mWindowManager.updateViewLayout(mOverlayView, mLayoutParams);
                     }
                     return true;
@@ -289,10 +324,13 @@ public class GameBar {
                         mHandler.removeCallbacks(mLongPressRunnable);
                     }
                     if (mDraggable) {
+                        // BOUNDS CHECKING on release
+                        enforceOverlayBounds();
+
                         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(mContext);
                         prefs.edit()
-                                .putInt(PREF_KEY_X, mLayoutParams.x)
-                                .putInt(PREF_KEY_Y, mLayoutParams.y)
+                                .putInt(PREF_KEY_DRAGGED_X, mLayoutParams.x)
+                                .putInt(PREF_KEY_DRAGGED_Y, mLayoutParams.y)
                                 .apply();
                     }
                     return true;
@@ -304,14 +342,10 @@ public class GameBar {
         mIsShowing = true;
         startUpdates();
 
-        // Start the FPS meter if using the new API method.
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             GameBarFpsMeter.getInstance(mContext).start();
         }
     }
-
-    private int initialX, initialY;
-    private float initialTouchX, initialTouchY;
 
     public void hide() {
         if (!mIsShowing) return;
@@ -326,24 +360,134 @@ public class GameBar {
         }
     }
 
+    private void enforceOverlayBounds() {
+        if (mOverlayView == null || mLayoutParams == null) return;
+
+        int margin = dpToPx(mContext, DRAG_BOUNDARY_MARGIN_DP);
+        int overlayWidth = mOverlayView.getWidth();
+        int overlayHeight = mOverlayView.getHeight();
+
+        // Ensure overlay stays mostly visible on screen
+        mLayoutParams.x = Math.max(-overlayWidth + margin,
+                            Math.min(mScreenWidth - margin, mLayoutParams.x));
+        mLayoutParams.y = Math.max(-overlayHeight + margin,
+                            Math.min(mScreenHeight - margin, mLayoutParams.y));
+    }
+
+    private int getAvailableWidth() {
+        int availableWidth = mScreenWidth;
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            try {
+                DisplayCutout cutout = mWindowManager.getDefaultDisplay().getCutout();
+                if (cutout != null) {
+                    availableWidth -= (cutout.getSafeInsetLeft() + cutout.getSafeInsetRight());
+                }
+            } catch (Exception e) {
+                // Fallback if cutout is not available
+            }
+        }
+
+        return availableWidth - dpToPx(mContext, 16);
+    }
+
+    private int measureItemWidth(StatData data) {
+        if ("minimal".equals(mOverlayFormat)) {
+            // Minimal format: label + value
+            String abbrev = abbreviateStatLabel(data.title);
+            int labelWidth = getTextWidth(abbrev, Math.max(mTextSizeSp - 2, 10), false);
+            int valueWidth = getTextWidth(data.value, mTextSizeSp, true);
+            int padding = dpToPx(mContext, 4); // label padding
+            return labelWidth + valueWidth + padding;
+        } else {
+            // Full format: title + value (side by side)
+            int titleWidth = getTextWidth(data.title, mTextSizeSp, false);
+            int valueWidth = getTextWidth(data.value, mTextSizeSp, false);
+            int titleLayoutWidth = dpToPx(mContext, LABEL_WIDTH_DP);
+            int valueLayoutWidth = dpToPx(mContext, VALUE_WIDTH_DP);
+            return titleLayoutWidth + valueLayoutWidth;
+        }
+    }
+
+    private int getTextWidth(String text, int textSizeSp, boolean isBold) {
+        TextPaint paint = new TextPaint();
+        paint.setTextSize(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, textSizeSp,
+                mContext.getResources().getDisplayMetrics()));
+        if (isBold) {
+            paint.setTypeface(Typeface.defaultFromStyle(android.graphics.Typeface.BOLD));
+        }
+        return (int) Math.ceil(paint.measureText(text));
+    }
+
+    private List<StatData> filterItemsForSideBySide(List<StatData> allItems) {
+        List<StatData> filtered = new ArrayList<>();
+
+        int availableWidth = getAvailableWidth();
+        int spacingPx = dpToPx(mContext, mItemSpacingDp);
+
+        // For minimal format, add separator dot width
+        int separatorWidth = "minimal".equals(mOverlayFormat) ?
+                getTextWidth(" · ", mTextSizeSp, false) : 0;
+
+        int usedWidth = 0;
+
+        for (StatData item : allItems) {
+            // Skip CPU freqs in minimal mode
+            if ("minimal".equals(mOverlayFormat) && item.isCpuFreq) {
+                continue;
+            }
+
+            // Measure this item's width (title + value pair)
+            int itemWidth = measureItemWidth(item);
+            int itemTotalWidth = itemWidth + (spacingPx * 2); // left + right spacing
+
+            // Add separator width if not first item (minimal mode only)
+            if ("minimal".equals(mOverlayFormat) && !filtered.isEmpty()) {
+                itemTotalWidth += separatorWidth + (spacingPx * 2);
+            }
+
+            // Check if this complete pair (title + value) fits
+            if (usedWidth + itemTotalWidth <= availableWidth) {
+                filtered.add(item);
+                usedWidth += itemTotalWidth;
+            } else {
+                // No more space, stop adding items (even if only value was cut, skip the whole pair)
+                break;
+            }
+        }
+
+        // Ensure at least one complete pair is shown
+        if (filtered.isEmpty() && !allItems.isEmpty()) {
+            // Find first non-CPU-freq item
+            for (StatData item : allItems) {
+                if (!("minimal".equals(mOverlayFormat) && item.isCpuFreq)) {
+                    filtered.add(item);
+                    break;
+                }
+            }
+        }
+
+        return filtered;
+    }
+
     private void updateStats() {
         if (!mIsShowing || mRootLayout == null) return;
 
         mRootLayout.removeAllViews();
 
-        List<View> statViews = new ArrayList<>();
+        List<StatData> statDataList = new ArrayList<>();
 
         // 1) FPS
-        float fpsVal = GameBarFpsMeter.getInstance(mContext).getFps();
-        String fpsStr = fpsVal >= 0 ? String.format(Locale.getDefault(), "%.0f", fpsVal) : "N/A";
         if (mShowFps) {
-            statViews.add(createStatLine("FPS", fpsStr));
+            float fpsVal = GameBarFpsMeter.getInstance(mContext).getFps();
+            String fpsStr = fpsVal >= 0 ? String.format(Locale.getDefault(), "%.0f", fpsVal) : "N/A";
+            statDataList.add(new StatData("FPS", fpsStr, false));
         }
 
         // 2) Battery temp
-        String batteryTempStr = "N/A";
         if (mShowBatteryTemp) {
             String tmp = readLine(BATTERY_TEMP_PATH);
+            String batteryTempStr = "N/A";
             if (tmp != null && !tmp.isEmpty()) {
                 try {
                     int raw = Integer.parseInt(tmp.trim());
@@ -351,84 +495,112 @@ public class GameBar {
                     batteryTempStr = String.format(Locale.getDefault(), "%.1f", c);
                 } catch (NumberFormatException ignored) {}
             }
-            statViews.add(createStatLine("Temp", batteryTempStr + "°C"));
+            statDataList.add(new StatData("Temp", batteryTempStr + "°C", false));
         }
 
         // 3) CPU usage
-        String cpuUsageStr = "N/A";
         if (mShowCpuUsage) {
-            cpuUsageStr = GameBarCpuInfo.getCpuUsage();
+            String cpuUsageStr = GameBarCpuInfo.getCpuUsage();
             String display = "N/A".equals(cpuUsageStr) ? "N/A" : cpuUsageStr + "%";
-            statViews.add(createStatLine("CPU", display));
+            statDataList.add(new StatData("CPU", display, false));
         }
 
-        // 4) CPU freq
+        // 4) CPU freq - special handling
         if (mShowCpuClock) {
             List<String> freqs = GameBarCpuInfo.getCpuFrequencies();
             if (!freqs.isEmpty()) {
-                statViews.add(buildCpuFreqView(freqs));
+                statDataList.add(new StatData("CPU Freq", "", true, freqs));
             }
         }
 
         // 5) CPU temp
-        String cpuTempStr = "N/A";
         if (mShowCpuTemp) {
-            cpuTempStr = GameBarCpuInfo.getCpuTemp();
-            statViews.add(createStatLine("CPU Temp", "N/A".equals(cpuTempStr) ? "N/A" : cpuTempStr + "°C"));
+            String cpuTempStr = GameBarCpuInfo.getCpuTemp();
+            statDataList.add(new StatData("CPU Temp", "N/A".equals(cpuTempStr) ? "N/A" : cpuTempStr + "°C", false));
         }
 
         // 6) RAM usage
-        String ramStr = "N/A";
         if (mShowRam) {
-            ramStr = GameBarMemInfo.getRamUsage();
-            statViews.add(createStatLine("RAM", "N/A".equals(ramStr) ? "N/A" : ramStr + " MB"));
+            String ramStr = GameBarMemInfo.getRamUsage();
+            statDataList.add(new StatData("RAM", "N/A".equals(ramStr) ? "N/A" : ramStr + " MB", false));
         }
 
         // 7) GPU usage
-        String gpuUsageStr = "N/A";
         if (mShowGpuUsage) {
-            gpuUsageStr = GameBarGpuInfo.getGpuUsage();
-            statViews.add(createStatLine("GPU", "N/A".equals(gpuUsageStr) ? "N/A" : gpuUsageStr + "%"));
+            String gpuUsageStr = GameBarGpuInfo.getGpuUsage();
+            statDataList.add(new StatData("GPU", "N/A".equals(gpuUsageStr) ? "N/A" : gpuUsageStr + "%", false));
         }
 
         // 8) GPU clock
-        String gpuClockStr = "N/A";
         if (mShowGpuClock) {
-            gpuClockStr = GameBarGpuInfo.getGpuClock();
-            statViews.add(createStatLine("GPU Freq", "N/A".equals(gpuClockStr) ? "N/A" : gpuClockStr + "MHz"));
+            String gpuClockStr = GameBarGpuInfo.getGpuClock();
+            statDataList.add(new StatData("GPU Freq", "N/A".equals(gpuClockStr) ? "N/A" : gpuClockStr + " MHz", false));
         }
 
         // 9) GPU temp
-        String gpuTempStr = "N/A";
         if (mShowGpuTemp) {
-            gpuTempStr = GameBarGpuInfo.getGpuTemp();
-            statViews.add(createStatLine("GPU Temp", "N/A".equals(gpuTempStr) ? "N/A" : gpuTempStr + "°C"));
+            String gpuTempStr = GameBarGpuInfo.getGpuTemp();
+            statDataList.add(new StatData("GPU Temp", "N/A".equals(gpuTempStr) ? "N/A" : gpuTempStr + "°C", false));
         }
 
+        // Build layout based on format and split mode
         if ("side_by_side".equals(mSplitMode)) {
             mRootLayout.setOrientation(LinearLayout.HORIZONTAL);
+            List<StatData> displayList = filterItemsForSideBySide(statDataList);
+
             if ("minimal".equals(mOverlayFormat)) {
-                for (int i = 0; i < statViews.size(); i++) {
-                    mRootLayout.addView(statViews.get(i));
-                    if (i < statViews.size() - 1) {
+                for (int i = 0; i < displayList.size(); i++) {
+                    StatData data = displayList.get(i);
+                    if (data.isCpuFreq) {
+                        continue;
+                    }
+                    mRootLayout.addView(createMinimalStatView(data.title, data.value));
+                    if (i < displayList.size() - 1) {
                         mRootLayout.addView(createDotView());
                     }
                 }
             } else {
-                for (View view : statViews) {
-                    mRootLayout.addView(view);
+                for (StatData data : displayList) {
+                    if (data.isCpuFreq) {
+                        mRootLayout.addView(buildCpuFreqView(data.cpuFreqs));
+                    } else {
+                        mRootLayout.addView(createStatLine(data.title, data.value));
+                    }
                 }
             }
         } else {
+            // Stacked/vertical mode
             mRootLayout.setOrientation(LinearLayout.VERTICAL);
-            for (View view : statViews) {
-                mRootLayout.addView(view);
+            for (StatData data : statDataList) {
+                if (data.isCpuFreq) {
+                    mRootLayout.addView(buildCpuFreqView(data.cpuFreqs));
+                } else {
+                    mRootLayout.addView(createStatLine(data.title, data.value));
+                }
             }
         }
 
         if (GameDataExport.getInstance().isCapturing()) {
             String dateTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date());
-            String pkgName = ForegroundAppDetector.getForegroundPackageName(mContext);
+            String pkgName = ForegroundAppDetector.getInstance(mContext).getCurrentForegroundApp();
+
+            String fpsStr = "N/A";
+            String batteryTempStr = "N/A";
+            String cpuUsageStr = "N/A";
+            String cpuTempStr = "N/A";
+            String gpuUsageStr = "N/A";
+            String gpuClockStr = "N/A";
+            String gpuTempStr = "N/A";
+
+            for (StatData data : statDataList) {
+                if ("FPS".equals(data.title)) fpsStr = data.value;
+                else if ("Temp".equals(data.title)) batteryTempStr = data.value;
+                else if ("CPU".equals(data.title)) cpuUsageStr = data.value;
+                else if ("CPU Temp".equals(data.title)) cpuTempStr = data.value;
+                else if ("GPU".equals(data.title)) gpuUsageStr = data.value;
+                else if ("GPU Freq".equals(data.title)) gpuClockStr = data.value;
+                else if ("GPU Temp".equals(data.title)) gpuTempStr = data.value;
+            }
 
             GameDataExport.getInstance().addOverlayData(
                     dateTime,
@@ -450,117 +622,318 @@ public class GameBar {
 
     private View buildCpuFreqView(List<String> freqs) {
         LinearLayout freqContainer = new LinearLayout(mContext);
-        freqContainer.setOrientation(LinearLayout.HORIZONTAL);
+        freqContainer.setOrientation(LinearLayout.VERTICAL);
 
         int spacingPx = dpToPx(mContext, mItemSpacingDp);
-        LinearLayout.LayoutParams outerLp = new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams containerLp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        outerLp.setMargins(spacingPx, spacingPx / 2, spacingPx, spacingPx / 2);
-        freqContainer.setLayoutParams(outerLp);
+        containerLp.setMargins(spacingPx, spacingPx / 2, spacingPx, spacingPx / 2);
+        freqContainer.setLayoutParams(containerLp);
 
-        if ("full".equals(mOverlayFormat)) {
-            TextView labelTv = new TextView(mContext);
-            labelTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, mTextSizeSp);
-            try {
-                labelTv.setTextColor(Color.parseColor(mTitleColorHex));
-            } catch (Exception e) {
-                labelTv.setTextColor(Color.WHITE);
-            }
-            labelTv.setText("CPU Freq ");
-            freqContainer.addView(labelTv);
-        }
+        // Build each CPU core frequency as a line (no category title)
+        for (int i = 0; i < freqs.size(); i++) {
+            String freqLine = freqs.get(i);
 
-        LinearLayout verticalFreqs = new LinearLayout(mContext);
-        verticalFreqs.setOrientation(LinearLayout.VERTICAL);
+            // Extract frequency value and pad to 4 chars if needed
+            String displayFreq = padFrequency(freqLine);
 
-        for (String freqLine : freqs) {
+            // Create CPU label (CPU0, CPU1, etc.)
+            String cpuLabel = "CPU" + i;
+
             LinearLayout lineLayout = new LinearLayout(mContext);
             lineLayout.setOrientation(LinearLayout.HORIZONTAL);
 
-            TextView freqTv = new TextView(mContext);
-            freqTv.setTextSize(TypedValue.COMPLEX_UNIT_SP, mTextSizeSp);
-            try {
-                freqTv.setTextColor(Color.parseColor(mValueColorHex));
-            } catch (Exception e) {
-                freqTv.setTextColor(Color.WHITE);
-            }
-            freqTv.setText(freqLine);
-
-            lineLayout.addView(freqTv);
-
             LinearLayout.LayoutParams lineLp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
+                    dpToPx(mContext, STAT_HEIGHT_DP)
             );
-            lineLp.setMargins(spacingPx, spacingPx / 4, spacingPx, spacingPx / 4);
+            lineLp.setMargins(spacingPx, spacingPx / 2, spacingPx, spacingPx / 2);
             lineLayout.setLayoutParams(lineLp);
+            lineLayout.setGravity(Gravity.CENTER_VERTICAL);
 
-            verticalFreqs.addView(lineLayout);
+            if ("full".equals(mOverlayFormat)) {
+                // Title: CPU0, CPU1, etc.
+                TextView tvTitle = new TextView(mContext);
+                tvTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, mTextSizeSp);
+
+                LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
+                        dpToPx(mContext, LABEL_WIDTH_DP),
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                );
+                tvTitle.setLayoutParams(titleLp);
+                tvTitle.setMaxLines(1);
+                tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+
+                try {
+                    tvTitle.setTextColor(Color.parseColor(mTitleColorHex));
+                } catch (Exception e) {
+                    tvTitle.setTextColor(Color.WHITE);
+                }
+                tvTitle.setText(cpuLabel);
+                tvTitle.setGravity(Gravity.CENTER_VERTICAL);
+
+                // Value: Padded frequency + MHz
+                TextView tvValue = new TextView(mContext);
+                tvValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, mTextSizeSp);
+                tvValue.setTypeface(Typeface.MONOSPACE);
+
+                LinearLayout.LayoutParams valueLp = new LinearLayout.LayoutParams(
+                        dpToPx(mContext, VALUE_WIDTH_DP),
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                );
+                tvValue.setLayoutParams(valueLp);
+                tvValue.setMaxLines(1);
+                tvValue.setEllipsize(android.text.TextUtils.TruncateAt.END);
+
+                try {
+                    tvValue.setTextColor(Color.parseColor(mValueColorHex));
+                } catch (Exception e) {
+                    tvValue.setTextColor(Color.WHITE);
+                }
+                tvValue.setText(displayFreq + " MHz");
+                tvValue.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+
+                lineLayout.addView(tvTitle);
+                lineLayout.addView(tvValue);
+            } else {
+                // Minimal format: just the value
+                TextView tvMinimal = new TextView(mContext);
+                tvMinimal.setTextSize(TypedValue.COMPLEX_UNIT_SP, mTextSizeSp);
+                tvMinimal.setTypeface(Typeface.MONOSPACE);
+
+                LinearLayout.LayoutParams minimalLp = new LinearLayout.LayoutParams(
+                        dpToPx(mContext, MINIMAL_VALUE_WIDTH_DP),
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                );
+                tvMinimal.setLayoutParams(minimalLp);
+                tvMinimal.setMaxLines(1);
+                tvMinimal.setEllipsize(android.text.TextUtils.TruncateAt.END);
+
+                try {
+                    tvMinimal.setTextColor(Color.parseColor(mValueColorHex));
+                } catch (Exception e) {
+                    tvMinimal.setTextColor(Color.WHITE);
+                }
+                tvMinimal.setText(displayFreq);
+                tvMinimal.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+
+                lineLayout.addView(tvMinimal);
+            }
+
+            freqContainer.addView(lineLayout);
         }
 
-        freqContainer.addView(verticalFreqs);
         return freqContainer;
+    }
+
+    private String padFrequency(String freqValue) {
+        // Extract only the LAST number sequence (the actual frequency)
+        String trimmed = freqValue.trim();
+
+        // Find the last sequence of digits
+        String numericValue = "";
+        for (int i = trimmed.length() - 1; i >= 0; i--) {
+            char c = trimmed.charAt(i);
+            if (Character.isDigit(c)) {
+                numericValue = c + numericValue;
+            } else if (!numericValue.isEmpty()) {
+                // We've hit a non-digit after finding digits, so stop
+                break;
+            }
+        }
+
+        if (numericValue.isEmpty()) {
+            return "   0"; // Default if parsing fails
+        }
+
+        // Pad with spaces on the left to make it 4 characters
+        while (numericValue.length() < 4) {
+            numericValue = " " + numericValue;
+        }
+
+        return numericValue;
     }
 
     private LinearLayout createStatLine(String title, String rawValue) {
         LinearLayout lineLayout = new LinearLayout(mContext);
         lineLayout.setOrientation(LinearLayout.HORIZONTAL);
 
+        LinearLayout.LayoutParams lineLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dpToPx(mContext, STAT_HEIGHT_DP)
+        );
+        int spacingPx = dpToPx(mContext, mItemSpacingDp);
+        lineLp.setMargins(spacingPx, spacingPx / 2, spacingPx, spacingPx / 2);
+        lineLayout.setLayoutParams(lineLp);
+        lineLayout.setGravity(Gravity.CENTER_VERTICAL);
+
         if ("full".equals(mOverlayFormat)) {
             TextView tvTitle = new TextView(mContext);
             tvTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, mTextSizeSp);
+
+            LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(
+                    dpToPx(mContext, LABEL_WIDTH_DP),
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            tvTitle.setLayoutParams(titleLp);
+            tvTitle.setMaxLines(1);
+            tvTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);
+
             try {
                 tvTitle.setTextColor(Color.parseColor(mTitleColorHex));
             } catch (Exception e) {
                 tvTitle.setTextColor(Color.WHITE);
             }
-            tvTitle.setText(title.isEmpty() ? "" : title + " ");
+            tvTitle.setText(title);
+            tvTitle.setGravity(Gravity.CENTER_VERTICAL);
 
             TextView tvValue = new TextView(mContext);
             tvValue.setTextSize(TypedValue.COMPLEX_UNIT_SP, mTextSizeSp);
+
+            LinearLayout.LayoutParams valueLp = new LinearLayout.LayoutParams(
+                    dpToPx(mContext, VALUE_WIDTH_DP),
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            tvValue.setLayoutParams(valueLp);
+            tvValue.setMaxLines(1);
+            tvValue.setEllipsize(android.text.TextUtils.TruncateAt.END);
+
             try {
                 tvValue.setTextColor(Color.parseColor(mValueColorHex));
             } catch (Exception e) {
                 tvValue.setTextColor(Color.WHITE);
             }
             tvValue.setText(rawValue);
+            tvValue.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
 
             lineLayout.addView(tvTitle);
             lineLayout.addView(tvValue);
         } else {
+            // Minimal format
             TextView tvMinimal = new TextView(mContext);
             tvMinimal.setTextSize(TypedValue.COMPLEX_UNIT_SP, mTextSizeSp);
+
+            LinearLayout.LayoutParams minimalLp = new LinearLayout.LayoutParams(
+                    dpToPx(mContext, MINIMAL_VALUE_WIDTH_DP),
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            tvMinimal.setLayoutParams(minimalLp);
+            tvMinimal.setMaxLines(1);
+            tvMinimal.setEllipsize(android.text.TextUtils.TruncateAt.END);
+
             try {
                 tvMinimal.setTextColor(Color.parseColor(mValueColorHex));
             } catch (Exception e) {
                 tvMinimal.setTextColor(Color.WHITE);
             }
             tvMinimal.setText(rawValue);
+            tvMinimal.setGravity(Gravity.CENTER_VERTICAL);
+
             lineLayout.addView(tvMinimal);
         }
 
-        int spacingPx = dpToPx(mContext, mItemSpacingDp);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-        lp.setMargins(spacingPx, spacingPx / 2, spacingPx, spacingPx / 2);
-        lineLayout.setLayoutParams(lp);
-
         return lineLayout;
+    }
+
+    private View createMinimalStatView(String title, String value) {
+        LinearLayout compact = new LinearLayout(mContext);
+        compact.setOrientation(LinearLayout.HORIZONTAL);
+        compact.setGravity(Gravity.CENTER_VERTICAL);
+
+        // Show abbreviated label (FPS:, CPU:, RAM:, etc.)
+        String abbrev = abbreviateStatLabel(title);
+
+        TextView label = new TextView(mContext);
+        label.setText(abbrev);
+        label.setTextSize(TypedValue.COMPLEX_UNIT_SP, Math.max(mTextSizeSp - 2, 10));
+        try {
+            label.setTextColor(Color.parseColor(mTitleColorHex));
+        } catch (Exception e) {
+            label.setTextColor(Color.WHITE);
+        }
+        label.setPadding(dpToPx(mContext, 2), 0, dpToPx(mContext, 2), 0);
+
+        TextView val = new TextView(mContext);
+        val.setText(value);
+        val.setTextSize(TypedValue.COMPLEX_UNIT_SP, mTextSizeSp);
+        try {
+            val.setTextColor(Color.parseColor(mValueColorHex));
+        } catch (Exception e) {
+            val.setTextColor(Color.WHITE);
+        }
+        val.setTypeface(null, android.graphics.Typeface.BOLD);
+        val.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+
+        LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dpToPx(mContext, STAT_HEIGHT_DP)
+        );
+        label.setLayoutParams(labelLp);
+
+        LinearLayout.LayoutParams valLp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dpToPx(mContext, STAT_HEIGHT_DP)
+        );
+        val.setLayoutParams(valLp);
+
+        compact.addView(label);
+        compact.addView(val);
+
+        // Long-press shows full stat name
+        compact.setOnLongClickListener(v -> {
+            Toast.makeText(mContext, title, Toast.LENGTH_SHORT).show();
+            return true;
+        });
+
+        return compact;
+    }
+
+    private String abbreviateStatLabel(String fullLabel) {
+        switch (fullLabel.toLowerCase()) {
+            case "fps": return "FPS:";
+            case "temp": return "°C:";
+            case "cpu": return "CPU:";
+            case "cpu temp": return "°T:";
+            case "cpu freq": return "MHz:";
+            case "ram": return "RAM:";
+            case "gpu": return "GPU:";
+            case "gpu freq": return "GMHz:";
+            case "gpu temp": return "°G:";
+            default: return fullLabel.substring(0, Math.min(4, fullLabel.length())) + ":";
+        }
+    }
+
+    public boolean isValidHexColor(String hex) {
+        if (hex == null || hex.isEmpty()) return false;
+        if (!hex.startsWith("#")) return false;
+        if (hex.length() != 7 && hex.length() != 9) return false;
+        try {
+            Color.parseColor(hex);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     private View createDotView() {
         TextView dotView = new TextView(mContext);
         dotView.setTextSize(TypedValue.COMPLEX_UNIT_SP, mTextSizeSp);
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dpToPx(mContext, STAT_HEIGHT_DP)
+        );
+        dotView.setLayoutParams(lp);
+        dotView.setGravity(Gravity.CENTER);
+
         try {
             dotView.setTextColor(Color.parseColor(mValueColorHex));
         } catch (Exception e) {
             dotView.setTextColor(Color.WHITE);
         }
-        dotView.setText(" . ");
+        dotView.setText(" · ");
         return dotView;
     }
 
@@ -577,6 +950,9 @@ public class GameBar {
 
     public void updateTextSize(int sp) {
         mTextSizeSp = sp;
+        if (mIsShowing) {
+            updateStats();
+        }
     }
 
     public void updateCornerRadius(int radius) {
@@ -596,10 +972,16 @@ public class GameBar {
 
     public void updateTitleColor(String hex) {
         mTitleColorHex = hex;
+        if (mIsShowing) {
+            updateStats();
+        }
     }
 
     public void updateValueColor(String hex) {
         mValueColorHex = hex;
+        if (mIsShowing) {
+            updateStats();
+        }
     }
 
     public void updateOverlayFormat(String format) {
@@ -619,7 +1001,7 @@ public class GameBar {
     private void applyBackgroundStyle() {
         int color = Color.argb(mBackgroundAlpha, 0, 0, 0);
         mBgDrawable.setColor(color);
-        mBgDrawable.setCornerRadius(mCornerRadius);
+        mBgDrawable.setCornerRadius(dpToPx(mContext, mCornerRadius));
 
         if (mOverlayView != null) {
             mOverlayView.setBackground(mBgDrawable);
@@ -687,7 +1069,7 @@ public class GameBar {
     }
 
     private void startUpdates() {
-        mHandler.removeCallbacksAndMessages(null);
+        mHandler.removeCallbacks(mUpdateRunnable);
         mHandler.post(mUpdateRunnable);
     }
 
@@ -702,12 +1084,18 @@ public class GameBar {
 
     private void loadSavedPosition(WindowManager.LayoutParams lp) {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(mContext);
-        int savedX = prefs.getInt(PREF_KEY_X, Integer.MIN_VALUE);
-        int savedY = prefs.getInt(PREF_KEY_Y, Integer.MIN_VALUE);
+        int savedX = prefs.getInt(PREF_KEY_DRAGGED_X, Integer.MIN_VALUE);
+        int savedY = prefs.getInt(PREF_KEY_DRAGGED_Y, Integer.MIN_VALUE);
+
         if (savedX != Integer.MIN_VALUE && savedY != Integer.MIN_VALUE) {
             lp.gravity = Gravity.TOP | Gravity.START;
             lp.x = savedX;
             lp.y = savedY;
+
+            // Validate bounds in case screen resolution changed
+            int margin = dpToPx(mContext, DRAG_BOUNDARY_MARGIN_DP);
+            lp.x = Math.max(-100 + margin, Math.min(mScreenWidth - margin, lp.x));
+            lp.y = Math.max(-100 + margin, Math.min(mScreenHeight - margin, lp.y));
         }
     }
 
@@ -770,5 +1158,28 @@ public class GameBar {
     private static int dpToPx(Context context, int dp) {
         float scale = context.getResources().getDisplayMetrics().density;
         return Math.round(dp * scale);
+    }
+
+    /**
+     * Helper class to hold stat data before layout creation
+     */
+    private static class StatData {
+        String title;
+        String value;
+        boolean isCpuFreq;
+        List<String> cpuFreqs;
+
+        StatData(String title, String value, boolean isCpuFreq) {
+            this.title = title;
+            this.value = value;
+            this.isCpuFreq = isCpuFreq;
+        }
+
+        StatData(String title, String value, boolean isCpuFreq, List<String> cpuFreqs) {
+            this.title = title;
+            this.value = value;
+            this.isCpuFreq = isCpuFreq;
+            this.cpuFreqs = cpuFreqs;
+        }
     }
 }

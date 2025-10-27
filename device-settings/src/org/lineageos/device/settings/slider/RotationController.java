@@ -43,7 +43,7 @@ public final class RotationController extends SliderControllerBase {
 
     @Override
     protected int processAction(int action) {
-        Log.d(TAG, "slider action: " + action);
+        Log.i(TAG, "slider action: " + action);
         switch (action) {
             case ROTATION_AUTO:
                 return setRotation(false, 0) ? Constants.MODE_ROTATION_AUTO : 0;

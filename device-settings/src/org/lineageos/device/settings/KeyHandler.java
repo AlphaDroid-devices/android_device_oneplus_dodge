@@ -50,7 +50,6 @@ import org.lineageos.device.settings.slider.NotificationRingerController;
 @Keep
 public class KeyHandler implements DeviceKeyHandler {
     private static final String TAG = KeyHandler.class.getSimpleName();
-    private static final boolean DEBUG = false;
 
     private final Context mContext;
     private final NotificationController mNotificationController;
@@ -70,7 +69,7 @@ public class KeyHandler implements DeviceKeyHandler {
             int usage = intent.getIntExtra(Constants.EXTRA_SLIDER_USAGE, 0);
             int[] actions = intent.getIntArrayExtra(Constants.EXTRA_SLIDER_ACTIONS);
 
-            Log.d(TAG, "update usage " + usage + " with actions " +
+            Log.i(TAG, "update usage " + usage + " with actions " +
                     Arrays.toString(actions));
 
             if (mSliderController != null) {

@@ -17,5 +17,7 @@
 <resources>
 
     <color name="config_icon_tint">?android:attr/colorControlNormal</color>
+    <color name="game_bar_title_color">#FFFFFFFF</color>   <!-- white -->
+    <color name="game_bar_value_color">#FF4CAF50</color>   <!-- green -->
 
 </resources>

@@ -18,23 +18,23 @@ package org.lineageos.device.settings.gamebar;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.widget.ListView;
-import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.PreferenceGroup;
+import androidx.preference.PreferenceManager;
 import androidx.preference.SwitchPreferenceCompat;
 
 import org.lineageos.device.settings.Constants;
 import org.lineageos.device.settings.R;
 import org.lineageos.device.settings.preferences.CustomSeekBarPreference;
 import org.lineageos.device.settings.utils.AppPreferencesHelper;
-import org.lineageos.device.settings.utils.PackageListAdapter;
 import org.lineageos.device.settings.utils.PackageListAdapter.PackageItem;
 import org.lineageos.device.settings.utils.AppListManager;
 
@@ -69,12 +69,14 @@ public class GameBarFragment extends PreferenceFragmentCompat {
     private ListPreference mValueColorPref;
     private ListPreference mPositionPref;
     private ListPreference mSplitModePref;
-    private ListPreference mOverlayFormatPref;
     private Preference mResetPositionPref;
 
     private PreferenceGroup mPackagesPreList;
     private Preference mAddPackagesPref;
     private AppListManager mAppListManager;
+
+    private SharedPreferences.OnSharedPreferenceChangeListener mPrefListener;
+
     private static final String GAME_BAR_ADD_PACKAGES = "game_bar_add_packages";
     private static final String GAME_BAR_APPLICATIONS = "game_bar_applications";
 
@@ -103,7 +105,7 @@ public class GameBarFragment extends PreferenceFragmentCompat {
             });
         }
 
-        // global switch
+        // Master enable
         SwitchPreferenceCompat enableSwitch = findPreference("game_bar_enable");
         if (enableSwitch != null) {
             enableSwitch.setOnPreferenceChangeListener((pref, newValue) -> {
@@ -113,7 +115,7 @@ public class GameBarFragment extends PreferenceFragmentCompat {
                         mGameBar.applyPreferences();
                         mGameBar.show();
                     } else {
-                        Toast.makeText(getContext(), R.string.overlay_permission_required, Toast.LENGTH_SHORT).show();
+                        // Block enable if overlay permission is missing
                         return false;
                     }
                 } else {
@@ -123,7 +125,7 @@ public class GameBarFragment extends PreferenceFragmentCompat {
             });
         }
 
-        // Display preferences
+        // Stats toggles
         mFpsSwitch = findPreference("game_bar_fps_enable");
         if (mFpsSwitch != null) {
             mFpsSwitch.setOnPreferenceChangeListener((pref, newValue) -> {
@@ -150,7 +152,6 @@ public class GameBarFragment extends PreferenceFragmentCompat {
 
         mCpuClockSwitch = findPreference("game_bar_cpu_clock_enable");
         if (mCpuClockSwitch != null) {
-            mCpuClockSwitch.setSummary("Shows CPU clock speed\n⚠ Hidden in minimal side-by-side layout");
             mCpuClockSwitch.setOnPreferenceChangeListener((pref, newValue) -> {
                 mGameBar.setShowCpuClock((boolean) newValue);
                 return true;
@@ -197,12 +198,11 @@ public class GameBarFragment extends PreferenceFragmentCompat {
             });
         }
 
-        // Capture preferences
+        // Data capture
         mCaptureStartPref = findPreference("game_bar_capture_start");
         if (mCaptureStartPref != null) {
             mCaptureStartPref.setOnPreferenceClickListener(pref -> {
                 GameDataExport.getInstance().startCapture();
-                Toast.makeText(getContext(), "Started logging Data", Toast.LENGTH_SHORT).show();
                 return true;
             });
         }
@@ -211,7 +211,6 @@ public class GameBarFragment extends PreferenceFragmentCompat {
         if (mCaptureStopPref != null) {
             mCaptureStopPref.setOnPreferenceClickListener(pref -> {
                 GameDataExport.getInstance().stopCapture();
-                Toast.makeText(getContext(), "Stopped logging Data", Toast.LENGTH_SHORT).show();
                 return true;
             });
         }
@@ -220,12 +219,11 @@ public class GameBarFragment extends PreferenceFragmentCompat {
         if (mCaptureExportPref != null) {
             mCaptureExportPref.setOnPreferenceClickListener(pref -> {
                 GameDataExport.getInstance().exportDataToCsv();
-                Toast.makeText(getContext(), "Exported log data to file", Toast.LENGTH_SHORT).show();
                 return true;
             });
         }
 
-        // Gesture preferences
+        // Gestures
         mDoubleTapCapturePref = findPreference("game_bar_doubletap_capture");
         if (mDoubleTapCapturePref != null) {
             mDoubleTapCapturePref.setOnPreferenceChangeListener((pref, newValue) -> {
@@ -261,39 +259,25 @@ public class GameBarFragment extends PreferenceFragmentCompat {
             });
         }
 
-        // UI customization preferences
+        // UI customization
         mTextSizePref = findPreference("game_bar_text_size");
         if (mTextSizePref != null) {
             mTextSizePref.setOnPreferenceChangeListener((pref, newValue) -> {
                 if (newValue instanceof Integer) {
-                    int sizeSp = (Integer) newValue;
-                    mGameBar.updateTextSize(sizeSp);
-                    pref.setSummary("Size: " + sizeSp + "SP (toggle overlay to preview)");
+                    mGameBar.updateTextSize((Integer) newValue);
                 }
                 return true;
             });
-            android.content.SharedPreferences prefs =
-                androidx.preference.PreferenceManager.getDefaultSharedPreferences(getContext());
-            int sizeSp = prefs.getInt("game_bar_text_size", 16);
-            mTextSizePref.setSummary("Size: " + sizeSp + "SP");
         }
 
         mBgAlphaPref = findPreference("game_bar_background_alpha");
         if (mBgAlphaPref != null) {
             mBgAlphaPref.setOnPreferenceChangeListener((pref, newValue) -> {
                 if (newValue instanceof Integer) {
-                    int alpha = (Integer) newValue;
-                    int percent = Math.round((alpha / 255f) * 100);
-                    mGameBar.updateBackgroundAlpha(alpha);
-                    pref.setSummary("Transparency: " + percent + "%");
+                    mGameBar.updateBackgroundAlpha((Integer) newValue);
                 }
                 return true;
             });
-            android.content.SharedPreferences prefsAlpha =
-                androidx.preference.PreferenceManager.getDefaultSharedPreferences(getContext());
-            int alpha = prefsAlpha.getInt("game_bar_background_alpha", 128);
-            int percent = Math.round((alpha / 255f) * 100);
-            mBgAlphaPref.setSummary("Transparency: " + percent + "%");
         }
 
         mCornerRadiusPref = findPreference("game_bar_corner_radius");
@@ -340,15 +324,12 @@ public class GameBarFragment extends PreferenceFragmentCompat {
         if (mTitleColorPref != null) {
             mTitleColorPref.setOnPreferenceChangeListener((pref, newValue) -> {
                 if (newValue instanceof String) {
-                    String hexColor = (String) newValue;
-                    if (mGameBar.isValidHexColor(hexColor)) {
-                        mGameBar.updateTitleColor(hexColor);
-                        Toast.makeText(getContext(), "Title color updated", Toast.LENGTH_SHORT).show();
+                    String hex = (String) newValue;
+                    if (mGameBar.isValidHexColor(hex)) {
+                        mGameBar.updateTitleColor(hex);
                         return true;
-                    } else {
-                        Toast.makeText(getContext(), "Invalid color format (use #RRGGBB)", Toast.LENGTH_SHORT).show();
-                        return false;
                     }
+                    return false;
                 }
                 return false;
             });
@@ -358,15 +339,12 @@ public class GameBarFragment extends PreferenceFragmentCompat {
         if (mValueColorPref != null) {
             mValueColorPref.setOnPreferenceChangeListener((pref, newValue) -> {
                 if (newValue instanceof String) {
-                    String hexColor = (String) newValue;
-                    if (mGameBar.isValidHexColor(hexColor)) {
-                        mGameBar.updateValueColor(hexColor);
-                        Toast.makeText(getContext(), "Value color updated", Toast.LENGTH_SHORT).show();
+                    String hex = (String) newValue;
+                    if (mGameBar.isValidHexColor(hex)) {
+                        mGameBar.updateValueColor(hex);
                         return true;
-                    } else {
-                        Toast.makeText(getContext(), "Invalid color format (use #RRGGBB)", Toast.LENGTH_SHORT).show();
-                        return false;
                     }
+                    return false;
                 }
                 return false;
             });
@@ -376,9 +354,7 @@ public class GameBarFragment extends PreferenceFragmentCompat {
         if (mPositionPref != null) {
             mPositionPref.setOnPreferenceChangeListener((pref, newValue) -> {
                 if (newValue instanceof String) {
-                    String pos = (String) newValue;
-                    mGameBar.updatePosition(pos);
-                    Toast.makeText(getContext(), "Position: " + formatPositionName(pos), Toast.LENGTH_SHORT).show();
+                    mGameBar.updatePosition((String) newValue);
                 }
                 return true;
             });
@@ -387,14 +363,15 @@ public class GameBarFragment extends PreferenceFragmentCompat {
         mResetPositionPref = findPreference("game_bar_reset_position");
         if (mResetPositionPref != null) {
             mResetPositionPref.setOnPreferenceClickListener(pref -> {
-                android.content.SharedPreferences prefs =
-                    androidx.preference.PreferenceManager.getDefaultSharedPreferences(getContext());
-                prefs.edit()
-                    .remove("game_bar_dragged_x")
-                    .remove("game_bar_dragged_y")
-                    .apply();
-                mGameBar.updatePosition("top_left");
-                Toast.makeText(getContext(), "Position reset to Top Left", Toast.LENGTH_SHORT).show();
+                Context ctx = getContext();
+                if (ctx != null) {
+                    SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
+                    prefs.edit()
+                            .remove("game_bar_dragged_x")
+                            .remove("game_bar_dragged_y")
+                            .apply();
+                    mGameBar.updatePosition("top_left");
+                }
                 return true;
             });
         }
@@ -403,70 +380,174 @@ public class GameBarFragment extends PreferenceFragmentCompat {
         if (mSplitModePref != null) {
             mSplitModePref.setOnPreferenceChangeListener((pref, newValue) -> {
                 if (newValue instanceof String) {
-                    String layout = (String) newValue;
-                    mGameBar.updateSplitMode(layout);
-                    Toast.makeText(getContext(), "Layout: " + (layout.equals("side_by_side") ? "Side-by-Side" : "Stacked"), Toast.LENGTH_SHORT).show();
+                    mGameBar.updateSplitMode((String) newValue);
                 }
                 return true;
             });
         }
+    }
 
-        mOverlayFormatPref = findPreference("game_bar_format");
-        if (mOverlayFormatPref != null) {
-            mOverlayFormatPref.setOnPreferenceChangeListener((pref, newValue) -> {
-                if (newValue instanceof String) {
-                    String format = (String) newValue;
-                    mGameBar.updateOverlayFormat(format);
-                    Toast.makeText(getContext(), "Format: " + (format.equals("minimal") ? "Minimal" : "Full"), Toast.LENGTH_SHORT).show();
-                }
-                return true;
-            });
+    // FIX #8: Fragment Lifecycle - Complete Methods with Null Safety
+    @Override
+    public void onResume() {
+        super.onResume();
+
+        Context ctx = getContext();
+        if (ctx == null) {
+            android.util.Log.w("GameBarFragment", "Context is null in onResume");
+            return;
+        }
+
+        if (!hasUsageStatsPermission(ctx)) {
+            requestUsageStatsPermission();
+        }
+
+        if (mAppListManager != null && mAppListManager.refreshAppList()) {
+            refreshAppListUI();
+        }
+
+        // Sync split mode ListPreference value + summary from persisted value
+        refreshSplitModeSummaryFromPrefs();
+
+        // Register a prefs listener so single-tap changes (from overlay) update UI live
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
+        mPrefListener = (sp, key) -> {
+            if ("game_bar_split_mode".equals(key)) {
+                refreshSplitModeSummaryFromPrefs();
+            }
+        };
+        prefs.registerOnSharedPreferenceChangeListener(mPrefListener);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+
+        // FIX #8: Unregister listener with null safety
+        Context ctx = getContext();
+        if (ctx != null && mPrefListener != null) {
+            try {
+                SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
+                prefs.unregisterOnSharedPreferenceChangeListener(mPrefListener);
+            } catch (Exception e) {
+                android.util.Log.w("GameBarFragment", "Failed to unregister preference listener", e);
+            }
+            mPrefListener = null;
         }
     }
 
     @Override
-    public void onResume() {
-        super.onResume();
-        if (!hasUsageStatsPermission(requireContext())) {
-            requestUsageStatsPermission();
+    public void onDestroyView() {
+        super.onDestroyView();
+
+        // FIX #8: Additional cleanup to prevent leaks
+        if (mPrefListener != null) {
+            Context ctx = getContext();
+            if (ctx != null) {
+                try {
+                    SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
+                    prefs.unregisterOnSharedPreferenceChangeListener(mPrefListener);
+                } catch (Exception e) {
+                    android.util.Log.w("GameBarFragment", "Failed to unregister listener in onDestroyView", e);
+                }
+            }
+            mPrefListener = null;
         }
-        if (mAppListManager.refreshAppList()) {
-            refreshAppListUI();
+
+        // Clear references to prevent memory leaks
+        mGameBar = null;
+        mAppListManager = null;
+    }
+
+    private void refreshSplitModeSummaryFromPrefs() {
+        if (mSplitModePref == null) return;
+
+        Context ctx = getContext();
+        if (ctx == null) {
+            android.util.Log.w("GameBarFragment", "Context is null, cannot refresh split mode");
+            return;
         }
+
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(ctx);
+        String newMode = prefs.getString("game_bar_split_mode", "stacked");
+
+        mSplitModePref.setValue(newMode);
+
+        String[] entries = getResources().getStringArray(R.array.game_bar_split_mode_entries);
+        String[] values  = getResources().getStringArray(R.array.game_bar_split_mode_values);
+
+        // default to first entry if not found
+        String summary = entries.length > 0 ? entries[0] : newMode;
+        for (int i = 0; i < values.length && i < entries.length; i++) {
+            if (values[i].equals(newMode)) {
+                summary = entries[i];
+                break;
+            }
+        }
+        mSplitModePref.setSummary(summary);
     }
 
     private void refreshAppListUI() {
+        Context ctx = getContext();
+        if (ctx == null || mPackagesPreList == null || mAddPackagesPref == null) {
+            android.util.Log.w("GameBarFragment", "Cannot refresh app list UI - missing context or preferences");
+            return;
+        }
+
+        if (mAppListManager == null) {
+            android.util.Log.w("GameBarFragment", "AppListManager is null");
+            return;
+        }
+
         AppPreferencesHelper.refreshAppPreferences(
                 mPackagesPreList,
                 mAddPackagesPref,
                 mAppListManager.getAppList(),
-                getContext(),
+                ctx,
                 packageName -> showDeleteConfirmation(packageName)
         );
     }
 
     private void showDeleteConfirmation(String packageName) {
+        if (!isAdded() || getActivity() == null || getActivity().isFinishing()) {
+            android.util.Log.w("GameBarFragment", "Cannot show delete dialog - fragment not attached");
+            return;
+        }
+
         new AlertDialog.Builder(requireActivity())
                 .setTitle(R.string.delete)
                 .setMessage(R.string.delete_message)
                 .setIconAttribute(android.R.attr.alertDialogIcon)
                 .setPositiveButton(android.R.string.ok, (dialog, which) -> {
-                    mAppListManager.removeApp(packageName);
-                    refreshAppListUI();
+                    if (mAppListManager != null) {
+                        mAppListManager.removeApp(packageName);
+                        refreshAppListUI();
+                    }
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
     }
 
     private void showAppSelectionDialog() {
+        if (!isAdded() || getActivity() == null || getActivity().isFinishing()) {
+            android.util.Log.w("GameBarFragment", "Cannot show app selection - fragment not attached");
+            return;
+        }
+
+        Context ctx = getContext();
+        if (ctx == null || mAppListManager == null) {
+            android.util.Log.w("GameBarFragment", "Cannot show app selection - missing context or manager");
+            return;
+        }
+
         AlertDialog.Builder builder = new AlertDialog.Builder(requireActivity());
         final Dialog dialog;
         final ListView list = new ListView(requireActivity());
 
         HashSet<String> excludedPackages = new HashSet<>(mAppListManager.getAppList().keySet());
-        excludedPackages.add(getContext().getPackageName());
+        excludedPackages.add(ctx.getPackageName());
 
-        AppPreferencesHelper.setupPackageListAdapter(list, excludedPackages, getContext());
+        AppPreferencesHelper.setupPackageListAdapter(list, excludedPackages, ctx);
 
         builder.setTitle(R.string.add_app);
         builder.setView(list);
@@ -474,8 +555,10 @@ public class GameBarFragment extends PreferenceFragmentCompat {
 
         list.setOnItemClickListener((parent, view, position, id) -> {
             PackageItem info = (PackageItem) parent.getItemAtPosition(position);
-            mAppListManager.addApp(info.packageName);
-            refreshAppListUI();
+            if (mAppListManager != null) {
+                mAppListManager.addApp(info.packageName);
+                refreshAppListUI();
+            }
             dialog.dismiss();
         });
 
@@ -485,19 +568,9 @@ public class GameBarFragment extends PreferenceFragmentCompat {
     }
 
     private void onAppListChanged() {
-        GameBarMonitorService.notifyStateChanged(getContext());
-    }
-
-    private String formatPositionName(String pos) {
-        switch (pos) {
-            case "top_left": return "Top Left";
-            case "top_center": return "Top Center";
-            case "top_right": return "Top Right";
-            case "bottom_left": return "Bottom Left";
-            case "bottom_center": return "Bottom Center";
-            case "bottom_right": return "Bottom Right";
-            case "draggable": return "Draggable";
-            default: return pos;
+        Context ctx = getContext();
+        if (ctx != null) {
+            GameBarMonitorService.notifyStateChanged(ctx);
         }
     }
 

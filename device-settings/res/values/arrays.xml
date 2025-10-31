@@ -144,17 +144,6 @@
         <item>side_by_side</item>
     </string-array>
 
-    <!-- GameBar Format Options - Using translatable strings -->
-    <string-array name="game_bar_format_entries">
-        <item>@string/game_bar_format_full</item>
-        <item>@string/game_bar_format_minimal</item>
-    </string-array>
-
-    <string-array name="game_bar_format_values">
-        <item>full</item>
-        <item>minimal</item>
-    </string-array>
-
     <!-- GameBar Color Options - Using translatable strings -->
     <string-array name="game_bar_color_entries">
         <item>@string/game_bar_color_white</item>

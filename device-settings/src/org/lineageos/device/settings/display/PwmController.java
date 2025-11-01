@@ -11,7 +11,7 @@ import android.util.Log;
 import androidx.preference.PreferenceManager;
 
 import org.lineageos.device.settings.Constants;
-import org.lineageos.device.settings.Utils;
+import org.lineageos.device.settings.utils.FileUtils;
 
 public class PwmController {
     private static final String TAG = "PwmController";
@@ -33,11 +33,11 @@ public class PwmController {
 
     public boolean isPwmEnabled() {
         return mSharedPrefs.getBoolean(Constants.KEY_ONEPULSE_PWM,
-                Utils.getFileValueAsBoolean(Constants.NODE_ONEPULSE_PWM, false));
+                FileUtils.getFileValueAsBoolean(Constants.NODE_ONEPULSE_PWM, false));
     }
 
     public boolean enablePwm() {
-        if (!Utils.fileWritable(Constants.NODE_ONEPULSE_PWM)) {
+        if (!FileUtils.isFileWritable(Constants.NODE_ONEPULSE_PWM)) {
             Log.w(TAG, "PWM node is not writable");
             return false;
         }
@@ -54,7 +54,7 @@ public class PwmController {
     }
 
     public boolean disablePwm() {
-        if (!Utils.fileWritable(Constants.NODE_ONEPULSE_PWM)) {
+        if (!FileUtils.isFileWritable(Constants.NODE_ONEPULSE_PWM)) {
             Log.w(TAG, "PWM node is not writable");
             return false;
         }
@@ -64,7 +64,7 @@ public class PwmController {
     }
 
     private void setPwm(boolean enable) {
-        Utils.writeValue(Constants.NODE_ONEPULSE_PWM, enable ? "1" : "0");
+        FileUtils.writeLine(Constants.NODE_ONEPULSE_PWM, enable ? "1" : "0");
         mSharedPrefs.edit().putBoolean(Constants.KEY_ONEPULSE_PWM, enable).commit();
         Log.i(TAG, "PWM set to: " + enable);
     }

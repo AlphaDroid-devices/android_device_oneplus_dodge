@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2016 The CyanogenMod Project
+ * Copyright (C) 2025 AlphaDroid
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,12 +35,22 @@ public final class FileUtils {
     }
 
     /**
-     * Reads the first line of text from the given file.
+     * Reads the first line of text from the given file. Returns null on failure.
+     *
+     * NOTE: this method preserves raw content (no trimming). Use readLineTrimmed(...) if you
+     * want whitespace trimmed automatically.
+     */
+    public static String readLine(String fileName) {
+        return readLine(fileName, false);
+    }
+
+    /**
+     * Reads the first line of text from the given file, with optional trimming
      * Reference {@link BufferedReader#readLine()} for clarification on what a line is
      *
      * @return the read line contents, or null on failure
      */
-    public static String readOneLine(String fileName) {
+    public static String readLine(String fileName, boolean trim) {
         String line = null;
         BufferedReader reader = null;
 
@@ -60,7 +71,14 @@ public final class FileUtils {
             }
         }
 
-        return line;
+        return trim ? line.trim() : line;
+    }
+
+    /**
+     * Reads the first line and returns the trimmed result (null on failure).
+     */
+    public static String readLineTrimmed(String fileName) {
+        return readLine(fileName, true);
     }
 
     /**
@@ -158,19 +176,30 @@ public final class FileUtils {
         return ok;
     }
 
+    /**
+     * Reads file content or returns defValue if read fails.
+     */
+    public static String getFileValue(String filename, String defValue) {
+        String v = readLine(filename);
+        return v != null ? v : defValue;
+    }
+
     public static boolean getFileValueAsBoolean(String filename, boolean defValue) {
-        String fileValue = readOneLine(filename);
-        if(fileValue!=null){
-            return (fileValue.equals("0")?false:true);
+        String v = readLine(filename);
+        if (v != null) {
+            return !"0".equals(v);
         }
         return defValue;
     }
 
-    public static String getFileValue(String filename, String defValue) {
-        String fileValue = readOneLine(filename);
-        if(fileValue!=null){
-            return fileValue;
+    public static int getFileValueAsInt(String filename, int defValue) {
+        String v = readLineTrimmed(filename);
+        if (v == null) return defValue;
+        try {
+            return Integer.parseInt(v);
+        } catch (NumberFormatException e) {
+            Log.w(TAG, "Unable to parse int from " + filename + ": " + v, e);
+            return defValue;
         }
-        return defValue;
     }
 }

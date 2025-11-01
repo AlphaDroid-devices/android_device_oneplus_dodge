@@ -15,7 +15,7 @@ import android.util.Log;
 import androidx.preference.PreferenceManager;
 
 import org.lineageos.device.settings.Constants;
-import org.lineageos.device.settings.Utils;
+import org.lineageos.device.settings.utils.FileUtils;
 
 public class HbmController {
     private static final String TAG = "HbmController";
@@ -43,11 +43,11 @@ public class HbmController {
 
     public boolean isHbmEnabled() {
         return mSharedPrefs.getBoolean(Constants.KEY_HBM,
-                Utils.getFileValueAsBoolean(Constants.NODE_HBM, false));
+                FileUtils.getFileValueAsBoolean(Constants.NODE_HBM, false));
     }
 
     public boolean enableHbm() {
-        if (!Utils.fileWritable(Constants.NODE_HBM)) {
+        if (!FileUtils.isFileWritable(Constants.NODE_HBM)) {
             Log.w(TAG, "HBM node is not writable");
             return false;
         }
@@ -64,7 +64,7 @@ public class HbmController {
     }
 
     public boolean disableHbm() {
-        if (!Utils.fileWritable(Constants.NODE_HBM)) {
+        if (!FileUtils.isFileWritable(Constants.NODE_HBM)) {
             Log.w(TAG, "HBM node is not writable");
             return false;
         }
@@ -116,7 +116,7 @@ public class HbmController {
         // Write HBM sysfs node with delay
         final Handler handler = new Handler(Looper.getMainLooper());
         handler.postDelayed(() -> {
-            Utils.writeValue(Constants.NODE_HBM, "1");
+            FileUtils.writeLine(Constants.NODE_HBM, "1");
             mSharedPrefs.edit().putBoolean(Constants.KEY_HBM, true).commit();
             Log.i(TAG, "HBM sysfs node enabled");
         }, 100);
@@ -142,7 +142,7 @@ public class HbmController {
         // Disable HBM sysfs node with delay
         final Handler handler = new Handler(Looper.getMainLooper());
         handler.postDelayed(() -> {
-            Utils.writeValue(Constants.NODE_HBM, "0");
+            FileUtils.writeLine(Constants.NODE_HBM, "0");
             mSharedPrefs.edit().putBoolean(Constants.KEY_HBM, false).commit();
 
             // Clear backed up values

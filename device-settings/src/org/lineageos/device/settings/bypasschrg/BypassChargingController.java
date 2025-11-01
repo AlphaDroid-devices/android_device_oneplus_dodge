@@ -110,7 +110,7 @@ public class BypassChargingController {
     private boolean enableHardwareBypass() {
         try {
             FileUtils.writeLine(Constants.NODE_BYPASS_CHARGING, BYPASS_ENABLED);
-            String verify = FileUtils.readOneLine(Constants.NODE_BYPASS_CHARGING);
+            String verify = FileUtils.readLine(Constants.NODE_BYPASS_CHARGING);
             if (!BYPASS_ENABLED.equals(verify)) {
                 Log.e(TAG, "Hardware bypass enable verification failed");
                 return false;
@@ -126,7 +126,7 @@ public class BypassChargingController {
     private boolean disableHardwareBypass() {
         try {
             FileUtils.writeLine(Constants.NODE_BYPASS_CHARGING, BYPASS_DISABLED);
-            String verify = FileUtils.readOneLine(Constants.NODE_BYPASS_CHARGING);
+            String verify = FileUtils.readLine(Constants.NODE_BYPASS_CHARGING);
             if (!BYPASS_DISABLED.equals(verify)) {
                 Log.e(TAG, "Hardware bypass disable verification failed");
                 return false;
@@ -141,7 +141,7 @@ public class BypassChargingController {
 
     public boolean isBypassChargingSupported() {
         try {
-            FileUtils.readOneLine(Constants.NODE_BYPASS_CHARGING);
+            FileUtils.readLine(Constants.NODE_BYPASS_CHARGING);
             return true;
         } catch (Exception e) {
             return false;

@@ -19,81 +19,22 @@ package org.lineageos.device.settings;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.text.TextUtils;
 import android.util.Log;
-
-import androidx.preference.PreferenceManager;
-
-import org.lineageos.device.settings.bypasschrg.BypassChargingController;
-import org.lineageos.device.settings.bypasschrg.BypassChargingManager;
-import org.lineageos.device.settings.gamebar.GameBar;
-import org.lineageos.device.settings.gamebar.GameBarController;
-import org.lineageos.device.settings.gamebar.GameBarMonitorService;
-import org.lineageos.device.settings.refreshrate.RefreshRateController;
-import org.lineageos.device.settings.refreshrate.RefreshRateMonitorService;
 
 public class BootCompletedReceiver extends BroadcastReceiver {
     private static final String TAG = "BootCompletedReceiver";
 
     @Override
     public void onReceive(final Context context, Intent intent) {
-        String action = intent.getAction();
-        if (Intent.ACTION_BOOT_COMPLETED.equals(action)) {
-            if (Constants.DEBUG) Log.i(TAG, "Boot completed - initializing services");
-            initializeBypassCharging(context);
-            initializeGameBar(context);
-            initializeRefreshRate(context);
-        }
-    }
+        if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
+            if (Constants. DEBUG) Log.i(TAG, "Boot completed - starting DeviceSettingsService");
 
-    private void initializeBypassCharging(Context context) {
-        if (Constants.DEBUG) Log.i(TAG, "Initializing BypassCharging");
-        try {
-            BypassChargingController controller = BypassChargingController.getInstance(context);
-            BypassChargingManager.notifyStateChanged(context, controller.getState());
-            if (Constants.DEBUG) Log.i(TAG, "BypassCharging initialized");
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to initialize BypassCharging", e);
-        }
-    }
-
-    private void initializeGameBar(Context context) {
-        if (Constants.DEBUG) Log.i(TAG, "Initializing GameBar");
-        try {
-            var prefs = PreferenceManager.getDefaultSharedPreferences(context);
-            boolean masterEnabled = prefs.getBoolean("game_bar_enable", false);
-            boolean hasAutoApps = hasGameBarAutoApps(context);
-            if (Constants.DEBUG) Log.i(TAG, "GameBar state: masterEnabled=" + masterEnabled + ", hasAutoApps=" + hasAutoApps);
-            if (masterEnabled) {
-                // Restore GameBar overlay state
-                GameBar.getInstance(context).applyPreferences();
-                GameBar.getInstance(context).show();
-                if (Constants.DEBUG) Log.i(TAG, "GameBar overlay restored");
+            try {
+                Intent serviceIntent = new Intent(context, DeviceSettingsService.class);
+                context.startService(serviceIntent);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to start DeviceSettingsService", e);
             }
-            if (masterEnabled || hasAutoApps) {
-                // Start monitoring service
-                GameBarMonitorService.notifyStateChanged(context);
-                if (Constants.DEBUG) Log.i(TAG, "GameBar monitoring service initialized");
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to initialize GameBar", e);
         }
-    }
-
-    private void initializeRefreshRate(Context context) {
-        if (Constants.DEBUG) Log.i(TAG, "Initializing RefreshRate");
-        try {
-            RefreshRateController controller = RefreshRateController.getInstance(context);
-            RefreshRateMonitorService.notifyStateChanged(context);
-            if (Constants.DEBUG) Log.i(TAG, "RefreshRate initialized");
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to initialize RefreshRate", e);
-        }
-    }
-
-    private boolean hasGameBarAutoApps(Context context) {
-        String raw = PreferenceManager.getDefaultSharedPreferences(context)
-                .getString(Constants.KEY_GAMEBAR_AUTO_APPS, "");
-        return !TextUtils.isEmpty(raw);
     }
 }

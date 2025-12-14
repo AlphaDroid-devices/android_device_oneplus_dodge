@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2018-2024 crDroid Android Project
+ * Copyright (C) 2025 AlphaDroid
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +41,7 @@ import com.android.settingslib.widget.SettingsBasePreferenceFragment;
 import java.util.Arrays;
 
 import org.lineageos.device.settings.Constants;
+import org.lineageos.device.settings.display.DisplayModeController;
 import org.lineageos.device.settings.display.HbmController;
 import org.lineageos.device.settings.display.PwmController;
 import org.lineageos.device.settings.utils.FileUtils;
@@ -59,6 +61,7 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
 
     private HbmController mHbmController;
     private PwmController mPwmController;
+    private DisplayModeController mDisplayModeController;
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -66,6 +69,7 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
 
         mHbmController = HbmController.getInstance(getContext());
         mPwmController = PwmController.getInstance(getContext());
+        mDisplayModeController = DisplayModeController.getInstance(getContext());
 
         mOnePulsePWMSwitch = (SwitchPreferenceCompat) findPreference(Constants.KEY_ONEPULSE_PWM);
         if (FileUtils.isFileWritable(Constants.NODE_ONEPULSE_PWM)) {
@@ -85,12 +89,25 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
             mHbmSwitch.setEnabled(false);
         }
 
-        // Sync UI state: PWM has priority over HBM
+        // Sync UI state based on current HBM/PWM state
         syncHbmPwmState();
 
         initNotificationSliderPreference();
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Refresh state when returning to settings
+        syncHbmPwmState();
+    }
+
+    /**
+     * Sync HBM/PWM toggle states based on business logic:
+     * - PWM has priority over HBM
+     * - If PWM is enabled, HBM toggle is disabled
+     * - PWM toggle is always enabled (it can override HBM)
+     */
     private void syncHbmPwmState() {
         if (mOnePulsePWMSwitch == null || mHbmSwitch == null) {
             return;
@@ -99,19 +116,24 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
         boolean pwmEnabled = mPwmController.isPwmEnabled();
         boolean hbmEnabled = mHbmController.isHbmEnabled();
 
-        // PWM has priority: if PWM is enabled, disable HBM
+        // PWM has priority: if both are somehow enabled, disable HBM
         if (pwmEnabled && hbmEnabled) {
             Log.i(TAG, "PWM is enabled, disabling HBM (PWM has priority)");
             mHbmSwitch.setChecked(false);
             mHbmController.disableHbm();
+            mDisplayModeController.broadcastStateChange();
             hbmEnabled = false;
         }
 
-        // Update UI availability
+        // Update checkbox states
+        mOnePulsePWMSwitch.setChecked(pwmEnabled);
+        mHbmSwitch.setChecked(hbmEnabled);
+
         // HBM cannot be enabled if PWM is enabled
-        mHbmSwitch.setEnabled(!pwmEnabled);
-        // PWM cannot be enabled if HBM is enabled
-        mOnePulsePWMSwitch.setEnabled(!hbmEnabled);
+        mHbmSwitch.setEnabled(!pwmEnabled && FileUtils.isFileWritable(Constants.NODE_HBM));
+
+        // PWM can ALWAYS be toggled (it has priority and will auto-disable HBM)
+        mOnePulsePWMSwitch.setEnabled(FileUtils.isFileWritable(Constants.NODE_ONEPULSE_PWM));
     }
 
     private void initNotificationSliderPreference() {
@@ -138,17 +160,23 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
             boolean enabled = (Boolean) newValue;
 
             if (enabled) {
-                if (!mPwmController.enablePwm()) {
+                // PWM has priority - enablePwm() will auto-disable HBM if needed
+                if (!mDisplayModeController.enablePwm()) {
                     return false;
                 }
-                Log.i(TAG, "PWM enabled, disabling HBM");
+                Log.i(TAG, "PWM enabled");
+
+                // Update HBM switch state (it was disabled by enablePwm if it was on)
                 mHbmSwitch.setChecked(false);
                 mHbmSwitch.setEnabled(false);
             } else {
-                if (!mPwmController.disablePwm()) {
+                if (!mDisplayModeController.disablePwm()) {
                     return false;
                 }
-                mHbmSwitch.setEnabled(true);
+                Log.i(TAG, "PWM disabled");
+
+                // Re-enable HBM toggle
+                mHbmSwitch.setEnabled(FileUtils.isFileWritable(Constants.NODE_HBM));
             }
             return true;
         } else if (preference == mHbmSwitch) {
@@ -163,19 +191,21 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
 
             if (enabled && sharedPrefs.getBoolean(KEY_SHOW_HBM_WARNING, true)) {
                 showHbmWarningDialog();
+                // Return false - dialog will handle the actual enable
+                return false;
             } else {
                 if (enabled) {
-                    if (!mHbmController.enableHbm()) {
+                    if (!mDisplayModeController.enableHbm()) {
                         mHbmSwitch.setChecked(false);
                         return false;
                     }
-                    mOnePulsePWMSwitch.setEnabled(false);
+                    Log.i(TAG, "HBM enabled");
                 } else {
-                    if (!mHbmController.disableHbm()) {
+                    if (!mDisplayModeController.disableHbm()) {
                         mHbmSwitch.setChecked(true);
                         return false;
                     }
-                    mOnePulsePWMSwitch.setEnabled(true);
+                    Log.i(TAG, "HBM disabled");
                 }
             }
             return true;
@@ -239,15 +269,16 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
                                     PreferenceManager.getDefaultSharedPreferences(getContext());
                             sharedPrefs.edit().putBoolean(KEY_SHOW_HBM_WARNING, false).apply();
                         }
-                        if (mHbmController.enableHbm()) {
-                            mOnePulsePWMSwitch.setEnabled(false);
+                        if (mDisplayModeController.enableHbm()) {
+                            mHbmSwitch.setChecked(true);
+                            Log.i(TAG, "HBM enabled via dialog");
                         } else {
                             mHbmSwitch.setChecked(false);
+                            Log.w(TAG, "Failed to enable HBM via dialog");
                         }
                     })
                 .setNegativeButton(android.R.string.cancel, (dialog, which) -> {
                         mHbmSwitch.setChecked(false);
-                        mOnePulsePWMSwitch.setEnabled(true);
                     })
                 .setCancelable(false)
                 .show();

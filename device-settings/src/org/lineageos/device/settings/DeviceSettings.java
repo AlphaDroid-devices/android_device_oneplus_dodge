@@ -48,25 +48,12 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
         implements Preference.OnPreferenceChangeListener {
     private static final String TAG = DeviceSettings.class.getSimpleName();
 
-    // private static final String KEY_GAME_SWITCH = "game_mode";
-    // private static final String KEY_EDGE_TOUCH = "edge_touch";
-    //
-    // private static final String FILE_GAME = "/proc/touchpanel/game_switch_enable";
-    // private static final String FILE_EDGE = "/proc/touchpanel/oplus_tp_direction";
-    //
-    // private static final String KEY_USB2_SWITCH = "usb2_fast_charge";
-    //
-    // private static final String FILE_FAST_CHARGE = "/sys/module/oplus_chg/parameters/force_fast_charge";
-
     private static final String KEY_SHOW_HBM_WARNING = "hbm_warning";
 
     private ListPreference mTopKeyPref;
     private ListPreference mMiddleKeyPref;
     private ListPreference mBottomKeyPref;
 
-    // private SwitchPreferenceCompat mGameModeSwitch;
-    // private SwitchPreferenceCompat mEdgeTouchSwitch;
-    // private SwitchPreferenceCompat mUSB2FastChargeModeSwitch;
     private SwitchPreferenceCompat mOnePulsePWMSwitch;
     private SwitchPreferenceCompat mHbmSwitch;
 
@@ -79,36 +66,6 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
 
         mHbmController = HbmController.getInstance(getContext());
         mPwmController = PwmController.getInstance(getContext());
-
-        // mGameModeSwitch = (SwitchPreferenceCompat) findPreference(KEY_GAME_SWITCH);
-        // if (FileUtils.isFileWritable(FILE_GAME)) {
-        //     mGameModeSwitch.setEnabled(true);
-        //     mGameModeSwitch.setChecked(sharedPrefs.getBoolean(KEY_GAME_SWITCH,
-        //         FileUtils.getFileValueAsBoolean(FILE_GAME, false)));
-        //     mGameModeSwitch.setOnPreferenceChangeListener(this);
-        // } else {
-        //     mGameModeSwitch.setEnabled(false);
-        // }
-        //
-        // mEdgeTouchSwitch = (SwitchPreferenceCompat) findPreference(KEY_EDGE_TOUCH);
-        // if (FileUtils.isFileWritable(FILE_EDGE)) {
-        //     mEdgeTouchSwitch.setEnabled(true);
-        //     mEdgeTouchSwitch.setChecked(sharedPrefs.getBoolean(KEY_EDGE_TOUCH,
-        //         FileUtils.getFileValueAsBoolean(FILE_EDGE, false)));
-        //     mEdgeTouchSwitch.setOnPreferenceChangeListener(this);
-        // } else {
-        //     mEdgeTouchSwitch.setEnabled(false);
-        // }
-        //
-        // mUSB2FastChargeModeSwitch = (SwitchPreferenceCompat) findPreference(KEY_USB2_SWITCH);
-        // if (FileUtils.isFileWritable(FILE_FAST_CHARGE)) {
-        //     mUSB2FastChargeModeSwitch.setEnabled(true);
-        //     mUSB2FastChargeModeSwitch.setChecked(sharedPrefs.getBoolean(KEY_USB2_SWITCH,
-        //         FileUtils.getFileValueAsBoolean(FILE_FAST_CHARGE, false)));
-        //     mUSB2FastChargeModeSwitch.setOnPreferenceChangeListener(this);
-        // } else {
-        //     mUSB2FastChargeModeSwitch.setEnabled(false);
-        // }
 
         mOnePulsePWMSwitch = (SwitchPreferenceCompat) findPreference(Constants.KEY_ONEPULSE_PWM);
         if (FileUtils.isFileWritable(Constants.NODE_ONEPULSE_PWM)) {
@@ -176,23 +133,6 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
     @Override
     public boolean onPreferenceChange(Preference preference, Object newValue) {
         SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(getContext());
-
-        // if (preference == mGameModeSwitch) {
-        //     boolean enabled = (Boolean) newValue;
-        //     sharedPrefs.edit().putBoolean(KEY_GAME_SWITCH, enabled).apply();
-    	   //  FileUtils.writeLine(FILE_GAME, enabled ? "1" : "0");
-        //     return true;
-        // } else if (preference == mEdgeTouchSwitch) {
-        //     boolean enabled = (Boolean) newValue;
-        //     sharedPrefs.edit().putBoolean(KEY_EDGE_TOUCH, enabled).apply();
-    	   //  FileUtils.writeLine(FILE_EDGE, enabled ? "1" : "0");
-        //     return true;
-        // } else if (preference == mUSB2FastChargeModeSwitch) {
-        //     boolean enabled = (Boolean) newValue;
-        //     sharedPrefs.edit().putBoolean(KEY_USB2_SWITCH, enabled).apply();
-    	   //  FileUtils.writeLine(FILE_FAST_CHARGE, enabled ? "1" : "0");
-        //     return true;
-        // }
 
         if (preference == mOnePulsePWMSwitch) {
             boolean enabled = (Boolean) newValue;
@@ -526,15 +466,6 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
             Integer.parseInt(actionBottom)
         });
     }
-
-    // public static void restoreFastChargeSetting(Context context) {
-    //     if (FileUtils.isFileWritable(FILE_FAST_CHARGE)) {
-    //         SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(context);
-    //         boolean value = sharedPrefs.getBoolean(KEY_USB2_SWITCH,
-    //             FileUtils.getFileValueAsBoolean(FILE_FAST_CHARGE, false));
-    //         FileUtils.writeLine(FILE_FAST_CHARGE, value ? "1" : "0");
-    //     }
-    // }
 
     public static void restoreOnePulsePwmSetting(Context context) {
         if (FileUtils.isFileWritable(Constants.NODE_ONEPULSE_PWM)) {

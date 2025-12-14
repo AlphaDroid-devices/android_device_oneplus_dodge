@@ -52,47 +52,6 @@
             android:summary="%s" />
     </PreferenceCategory>
 
-<!--    <PreferenceCategory
-        android:key="touchpanel"
-        android:title="@string/touchpanel_title">
-
-        <SwitchPreferenceCompat
-            android:key="edge_touch"
-            android:icon="@drawable/ic_edge_touch"
-            android:summary="@string/edge_touch_summary"
-            android:title="@string/edge_touch_title" />
-
-        <Preference
-            android:key="edge_touch_info"
-            android:icon="@drawable/ic_info_outline"
-            android:summary="@string/edge_touch_warning"
-            android:persistent="false"
-            android:selectable="false" />
-
-        <SwitchPreferenceCompat
-            android:key="game_mode"
-            android:icon="@drawable/ic_game_mode"
-            android:summary="@string/game_mode_summary"
-            android:title="@string/game_mode_title" />
-
-        <Preference
-            android:icon="@drawable/ic_info_outline"
-            android:summary="@string/game_mode_warning"
-            android:persistent="false"
-            android:selectable="false" />
-    </PreferenceCategory>
-
-    <PreferenceCategory
-        android:key="usb"
-        android:title="@string/usb_title">
-
-        <SwitchPreferenceCompat
-            android:key="usb2_fast_charge"
-            android:icon="@drawable/ic_usb2_fc"
-            android:summary="@string/usb2_fc_summary"
-            android:title="@string/usb2_fc_title" />
-    </PreferenceCategory>-->
-
     <PreferenceCategory
         android:key="display_category"
         android:title="@string/display_category_title">

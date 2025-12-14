@@ -32,6 +32,9 @@ public class Constants {
     /* Debug flag */
     public static final boolean DEBUG = true;
 
+    // Device name prop
+    public static final String PROP_DEVICE_CODENAME = "ro.alpha.device";
+
     /* Alert Slider */
     public static final String NODE_SLIDER_STATE = "/proc/tristatekey/tri_state";
 

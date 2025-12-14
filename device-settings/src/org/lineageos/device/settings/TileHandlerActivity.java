@@ -35,6 +35,10 @@ import org.lineageos.device.settings.gamebar.GameBarTileService;
 import org.lineageos.device.settings.display.HbmTile;
 import org.lineageos.device.settings.display.PwmTile;
 
+/* ADDED imports for refresh-rate tile handling */
+import org.lineageos.device.settings.refreshrate.RefreshRateTile;
+import org.lineageos.device.settings.refreshrate.RefreshRateActivity;
+
 public final class TileHandlerActivity extends Activity {
     private static final String TAG = "TileHandlerActivity";
 
@@ -46,6 +50,7 @@ public final class TileHandlerActivity extends Activity {
         TILE_ACTIVITY_MAP.put(BypassChargingTile.class.getName(), BypassChargingActivity.class);
         TILE_ACTIVITY_MAP.put(HbmTile.class.getName(), DeviceSettings.class);
         TILE_ACTIVITY_MAP.put(PwmTile.class.getName(), DeviceSettings.class);
+        TILE_ACTIVITY_MAP.put(RefreshRateTile.class.getName(), RefreshRateActivity.class);
     }
 
     @Override

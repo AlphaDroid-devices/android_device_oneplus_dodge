@@ -241,22 +241,29 @@
     <string name="hbm_warning_dont_show_again">Don\'t show this warning again</string>
 
     <!-- Refresh Rate Settings -->
-    <string name="refresh_rate_title">Per-App Refresh Rate</string>
-    <string name="refresh_rate_summary">Customize refresh rate per application</string>
+    <string name="refresh_rate_title">Refresh rate</string>
+    <string name="refresh_rate_app_title">Per-App Refresh Rate</string>
+    <string name="refresh_rate_app_summary">Customize refresh rate per application</string>
     <string name="refresh_rate_settings">Display Refresh Rate</string>
     <string name="refresh_rate_global_title">Global Refresh Rate</string>
     <string name="refresh_rate_global_summary">Default refresh rate for all apps</string>
     <string name="refresh_rate_overrides_title">Per-App Overrides</string>
-    <string name="refresh_rate_title_dialog">Select Refresh Rate</string>
+    <string name="refresh_rate_app_title_dialog">Select Refresh Rate</string>
     <string name="no_app_overrides">No app-specific overrides configured</string>
     <string name="refresh_rate_auto">Auto</string>
     <string name="refresh_rate_60hz" translatable="false"> 60 Hz</string>
     <string name="refresh_rate_90hz" translatable="false"> 90 Hz</string>
     <string name="refresh_rate_120hz" translatable="false">120 Hz</string>
 
+    <!-- HBM/PWM/RefreshRate tile messages -->
+    <string name="hbm_unavailable_pwm_active">PWM is active</string>
+    <string name="refresh_rate_locked_hbm">Locked at 90Hz (HBM)</string>
+
     <!-- Generic -->
     <string name="delete">Delete</string>
     <string name="delete_message">Remove selected item?</string>
     <string name="add_app">Add Application</string>
+    <string name="on">On</string>
+    <string name="off">Off</string>
 
 </resources>

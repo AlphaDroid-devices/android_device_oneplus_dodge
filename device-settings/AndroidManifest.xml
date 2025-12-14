@@ -204,12 +204,12 @@
 
         <!-- Refresh rate activity -->
         <activity android:name=".refreshrate.RefreshRateActivity"
-            android:label="@string/refresh_rate_title"
+            android:label="@string/refresh_rate_app_title"
             android:theme="@style/Theme.SubSettingsBase.Expressive"
             android:exported="true">
             <meta-data
                 android:name="com.android.settings.summary"
-                android:resource="@string/refresh_rate_summary" />
+                android:resource="@string/refresh_rate_app_summary" />
         </activity>
 
         <!-- Refresh Rate Monitor Service -->
@@ -217,5 +217,17 @@
             android:name=".refreshrate.RefreshRateMonitorService"
             android:enabled="true"
             android:exported="false" />
+
+        <!-- Refresh Rate QS Tile Service -->
+        <service
+            android:name=".refreshrate.RefreshRateTile"
+            android:icon="@drawable/ic_refresh_rate"
+            android:label="@string/refresh_rate_title"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

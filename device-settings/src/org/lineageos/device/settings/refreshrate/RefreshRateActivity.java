@@ -17,6 +17,6 @@ public class RefreshRateActivity extends CollapsingToolbarBaseActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_refresh_rate);
-        setTitle(getString(R.string.bypass_charging_title));
+        setTitle(getString(R.string.refresh_rate_title));
     }
 }

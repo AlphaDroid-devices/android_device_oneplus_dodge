@@ -3,21 +3,24 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * Background service that monitors bypass charging state.
- * Uses shared ForegroundAppDetector for app monitoring.
+ * - Monitors battery level changes
+ * - Monitors foreground apps for app-based bypass
+ *
+ * Note: Power connect/disconnect is handled by DeviceSettingsService
  */
 
 package org.lineageos.device.settings.bypasschrg;
 
+import android.app.Service;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.BroadcastReceiver;
 import android.os.BatteryManager;
 import android.os.Handler;
 import android.os.IBinder;
 import android.text.TextUtils;
 import android.util.Log;
-import android.app.Service;
 
 import androidx.preference.PreferenceManager;
 
@@ -37,9 +40,7 @@ public class BypassChargingManager extends Service {
     private ForegroundAppDetector mForegroundDetector;
     private boolean mAppMonitoringActive = false;
 
-    // Receivers
     private BroadcastReceiver mBatteryReceiver;
-    private int mLastPluggedState = 0;
 
     // ===== Lifecycle =====
 
@@ -49,8 +50,7 @@ public class BypassChargingManager extends Service {
         sInstance = this;
         mHandler = new Handler();
         mForegroundDetector = ForegroundAppDetector.getInstance(this);
-        mLastPluggedState = 0;
-        if (Constants.DEBUG) Log.i(TAG, "Created (background service)");
+        if (Constants.DEBUG) Log.i(TAG, "Created");
     }
 
     @Override
@@ -80,7 +80,6 @@ public class BypassChargingManager extends Service {
 
         BypassChargingManager instance = sInstance;
         if (instance == null) {
-            // Start service
             Intent serviceIntent = new Intent(context, BypassChargingManager.class);
             try {
                 context.startService(serviceIntent);
@@ -103,12 +102,11 @@ public class BypassChargingManager extends Service {
 
         if (Constants.DEBUG) Log.i(TAG, "State: " + (state != null ? state.toString() : "null"));
 
-        // Determine if we need to do anything
         if (state != null) {
             boolean globalActive = state.globalStatus != Constants.BYPASS_OFF;
             boolean hasAppList = hasBypassAppsInPrefs();
 
-            if (!globalActive && !hasAppList) {
+            if (! globalActive && !hasAppList) {
                 if (Constants.DEBUG) Log.i(TAG, "Nothing to monitor - stopping service");
                 unregisterBatteryReceiver();
                 stopAppMonitoring();
@@ -117,14 +115,14 @@ public class BypassChargingManager extends Service {
             }
         }
 
-        // Monitor battery
+        // Monitor battery level
         registerBatteryReceiverIfNeeded();
 
         // Determine if we need app monitoring
         if (state != null) {
             boolean globalActive = state.globalStatus != Constants.BYPASS_OFF;
             boolean hasAppList = hasBypassAppsInPrefs();
-            boolean shouldMonitorApps = !globalActive && hasAppList;
+            boolean shouldMonitorApps = ! globalActive && hasAppList;
 
             if (shouldMonitorApps && !mAppMonitoringActive) {
                 if (Constants.DEBUG) Log.i(TAG, "Starting app monitoring");
@@ -147,31 +145,28 @@ public class BypassChargingManager extends Service {
         mAppMonitoringActive = true;
         BypassChargingManager self = this;
         mForegroundDetector.startMonitoring("BypassCharging", packageName -> {
-            if (Constants.DEBUG) Log.i(TAG, "Listener callback - Foreground app: " + packageName);
+            if (Constants.DEBUG) Log.i(TAG, "Foreground app: " + packageName);
 
             BypassChargingController controller = BypassChargingController.getInstance(self);
             Set<String> bypassApps = self.getBypassAppsFromPrefs();
 
-            if (Constants.DEBUG) Log.i(TAG, "Bypass apps list size: " + bypassApps.size() + ", searching for: " + packageName);
-
             if (bypassApps.contains(packageName)) {
-                if (Constants.DEBUG) Log.i(TAG, "App " + packageName + " in bypass list - activating");
+                if (Constants.DEBUG) Log.i(TAG, "App in bypass list - activating");
                 controller.setActiveApp(packageName);
             } else {
-                if (Constants.DEBUG) Log.i(TAG, "App " + packageName + " not in bypass list - clearing");
+                if (Constants.DEBUG) Log.i(TAG, "App not in bypass list - clearing");
                 controller.clearActiveApp();
             }
         });
-        if (Constants.DEBUG) Log.i(TAG, "App monitoring listener registered");
+        if (Constants.DEBUG) Log.i(TAG, "App monitoring started");
     }
 
     private void stopAppMonitoring() {
-        if (!mAppMonitoringActive) {
-            return;
-        }
+        if (!mAppMonitoringActive) return;
 
         mAppMonitoringActive = false;
         mForegroundDetector.stopMonitoring("BypassCharging");
+        if (Constants.DEBUG) Log.i(TAG, "App monitoring stopped");
     }
 
     private Set<String> getBypassAppsFromPrefs() {
@@ -192,10 +187,10 @@ public class BypassChargingManager extends Service {
     private boolean hasBypassAppsInPrefs() {
         String raw = PreferenceManager.getDefaultSharedPreferences(this)
                 .getString(Constants.KEY_BYPASS_CHARGING_APPS, "");
-        return !TextUtils.isEmpty(raw);
+        return ! TextUtils.isEmpty(raw);
     }
 
-    // ===== Battery monitoring =====
+    // ===== Battery monitoring (level only) =====
 
     private void registerBatteryReceiverIfNeeded() {
         if (mBatteryReceiver != null) return;
@@ -205,18 +200,7 @@ public class BypassChargingManager extends Service {
             public void onReceive(Context context, Intent intent) {
                 if (intent == null) return;
 
-                int plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0);
-
-                // Detect power reconnect
-                if (mLastPluggedState == 0 && plugged != 0) {
-                    if (Constants.DEBUG) Log.i(TAG, "Power reconnected");
-                    BypassChargingController controller =
-                            BypassChargingController.getInstance(getApplicationContext());
-                    controller.handlePowerConnected();
-                }
-
-                mLastPluggedState = plugged;
-
+                // Only handle battery level changes
                 int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
                 int scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
                 if (level < 0 || scale <= 0) return;

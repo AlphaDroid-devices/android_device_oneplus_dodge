@@ -120,7 +120,7 @@ public class AppRefreshRatePreference extends Preference {
         }
 
         new androidx.appcompat.app.AlertDialog.Builder(context)
-                .setTitle(R.string.refresh_rate_title_dialog)
+                .setTitle(R.string.refresh_rate_app_title_dialog)
                 .setSingleChoiceItems(options, checkedItem, (dialog, which) -> {
                     int selectedFps = values[which];
                     if (selectedFps != mCurrentFps) {

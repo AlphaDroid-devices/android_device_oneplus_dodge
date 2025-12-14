@@ -28,6 +28,7 @@ public class HbmController {
     private static final float HBM_FRAMERATE = 90.0f;
     private static final String KEY_BACKUP_MIN_REFRESH_RATE = "hbm_backup_min_refresh_rate";
     private static final String KEY_BACKUP_MAX_REFRESH_RATE = "hbm_backup_max_refresh_rate";
+    private static final String KEY_BACKUP_AUTO_BRIGHTNESS = "hbm_backup_auto_brightness";
 
     private HbmController(Context context) {
         mContext = context.getApplicationContext();
@@ -82,7 +83,18 @@ public class HbmController {
     }
 
     private void enableHbmInternal() {
-        // Read and store current MIN and MAX refresh rates
+        // 1.Backup and disable auto-brightness
+        boolean autoBrightnessEnabled = isAutoBrightnessEnabled();
+        mSharedPrefs.edit()
+                .putBoolean(KEY_BACKUP_AUTO_BRIGHTNESS, autoBrightnessEnabled)
+                .apply();
+
+        if (autoBrightnessEnabled) {
+            setAutoBrightness(false);
+            Log.i(TAG, "Auto-brightness disabled for HBM");
+        }
+
+        // 2. Backup refresh rates
         float currentMinRefreshRate = Settings.System.getFloatForUser(
                 mContext.getContentResolver(),
                 Settings.System.MIN_REFRESH_RATE,
@@ -97,13 +109,12 @@ public class HbmController {
 
         Log.i(TAG, "Backing up refresh rates - MIN: " + currentMinRefreshRate + ", MAX: " + currentMaxRefreshRate);
 
-        // Store original values in SharedPreferences
         mSharedPrefs.edit()
                 .putFloat(KEY_BACKUP_MIN_REFRESH_RATE, currentMinRefreshRate)
                 .putFloat(KEY_BACKUP_MAX_REFRESH_RATE, currentMaxRefreshRate)
                 .apply();
 
-        // Set constant framerate to 90Hz (workaround for kernel bug with dynamic framerate)
+        // 3.Set constant framerate to 90Hz (workaround for kernel bug with dynamic framerate)
         Settings.System.putFloatForUser(mContext.getContentResolver(),
                 Settings.System.MIN_REFRESH_RATE, HBM_FRAMERATE,
                 UserHandle.USER_CURRENT);
@@ -113,7 +124,7 @@ public class HbmController {
 
         Log.i(TAG, "HBM enabled - set MIN and MAX to: " + HBM_FRAMERATE);
 
-        // Write HBM sysfs node with delay
+        // 4.Write HBM sysfs node with delay
         final Handler handler = new Handler(Looper.getMainLooper());
         handler.postDelayed(() -> {
             FileUtils.writeLine(Constants.NODE_HBM, "1");
@@ -123,13 +134,19 @@ public class HbmController {
     }
 
     private void disableHbmInternal() {
-        // Retrieve backed up values
+        // 1. Restore auto-brightness if it was enabled before
+        boolean wasAutoBrightnessEnabled = mSharedPrefs.getBoolean(KEY_BACKUP_AUTO_BRIGHTNESS, false);
+        if (wasAutoBrightnessEnabled) {
+            setAutoBrightness(true);
+            Log.i(TAG, "Auto-brightness restored");
+        }
+
+        // 2.Restore refresh rates
         float backedUpMinRefreshRate = mSharedPrefs.getFloat(KEY_BACKUP_MIN_REFRESH_RATE, MIN);
         float backedUpMaxRefreshRate = mSharedPrefs.getFloat(KEY_BACKUP_MAX_REFRESH_RATE, MAX);
 
         Log.i(TAG, "Restoring refresh rates - MIN: " + backedUpMinRefreshRate + ", MAX: " + backedUpMaxRefreshRate);
 
-        // Restore original settings
         Settings.System.putFloatForUser(mContext.getContentResolver(),
                 Settings.System.MIN_REFRESH_RATE, backedUpMinRefreshRate,
                 UserHandle.USER_CURRENT);
@@ -139,7 +156,7 @@ public class HbmController {
 
         Log.i(TAG, "HBM disabled - refresh rates restored");
 
-        // Disable HBM sysfs node with delay
+        // 3. Disable HBM sysfs node with delay
         final Handler handler = new Handler(Looper.getMainLooper());
         handler.postDelayed(() -> {
             FileUtils.writeLine(Constants.NODE_HBM, "0");
@@ -149,9 +166,33 @@ public class HbmController {
             mSharedPrefs.edit()
                     .remove(KEY_BACKUP_MIN_REFRESH_RATE)
                     .remove(KEY_BACKUP_MAX_REFRESH_RATE)
+                    .remove(KEY_BACKUP_AUTO_BRIGHTNESS)
                     .apply();
 
             Log.i(TAG, "HBM sysfs node disabled, backup cleared");
         }, 100);
+    }
+
+    private boolean isAutoBrightnessEnabled() {
+        try {
+            int mode = Settings.System.getIntForUser(
+                    mContext.getContentResolver(),
+                    Settings.System.SCREEN_BRIGHTNESS_MODE,
+                    Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
+                    UserHandle.USER_CURRENT);
+            return mode == Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to get auto-brightness state", e);
+            return false;
+        }
+    }
+
+    private void setAutoBrightness(boolean enabled) {
+        Settings.System.putIntForUser(
+                mContext.getContentResolver(),
+                Settings.System.SCREEN_BRIGHTNESS_MODE,
+                enabled ? Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC
+                        : Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
+                UserHandle.USER_CURRENT);
     }
 }

@@ -30,6 +30,7 @@ public class RefreshRateMonitorService extends Service {
 
     private static volatile RefreshRateMonitorService sInstance;
 
+    private RefreshRateController mRefreshRateController;
     private Handler mHandler;
     private ForegroundAppDetector mForegroundDetector;
     private boolean mAppMonitoringActive = false;
@@ -49,6 +50,7 @@ public class RefreshRateMonitorService extends Service {
     public void onCreate() {
         super.onCreate();
         sInstance = this;
+        mRefreshRateController = RefreshRateController.getInstance(this);
         mHandler = new Handler();
         mForegroundDetector = ForegroundAppDetector.getInstance(this);
         if (Constants.DEBUG) Log.i(TAG, "Service created");
@@ -97,13 +99,12 @@ public class RefreshRateMonitorService extends Service {
     // ===== State handling =====
 
     private void handleStateChanged() {
-        RefreshRateController controller = RefreshRateController.getInstance(this);
-        RefreshRateController.RefreshRateState state = controller.getState();
+        RefreshRateController.RefreshRateState state = mRefreshRateController.getState();
 
         if (Constants.DEBUG) Log.i(TAG, "State: " + state.toString());
 
         // Determine if we need to monitor
-        boolean hasAppOverrides = controller.hasAppOverrides();
+        boolean hasAppOverrides = mRefreshRateController.hasAppOverrides();
 
         if (!hasAppOverrides) {
             if (Constants.DEBUG) Log.i(TAG, "No app overrides - stopping app monitoring");
@@ -129,13 +130,11 @@ public class RefreshRateMonitorService extends Service {
         }
 
         mAppMonitoringActive = true;
-        RefreshRateMonitorService self = this;
 
         mForegroundDetector.startMonitoring("RefreshRate", packageName -> {
             if (Constants.DEBUG) Log.i(TAG, "Foreground app: " + packageName);
 
-            RefreshRateController controller = RefreshRateController.getInstance(self);
-            int targetFps = controller.getEffectiveRefreshRate(packageName);
+            int targetFps = mRefreshRateController.getEffectiveRefreshRate(packageName);
 
             if (Constants.DEBUG) {
                 String desc = targetFps == 0 ? "auto" : targetFps + " fps";
@@ -160,6 +159,8 @@ public class RefreshRateMonitorService extends Service {
     // ===== Refresh rate application via Settings =====
 
     private void applyRefreshRate(int fps) {
+        if (mRefreshRateController.shouldSkipRefreshRateChanges()) return;
+
         // Backup current rates if not already backed up
         if (mBackedUpMinRate < 0 || mBackedUpMaxRate < 0) {
             backupCurrentRates();

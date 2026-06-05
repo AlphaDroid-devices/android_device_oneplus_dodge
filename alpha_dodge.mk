@@ -46,6 +46,10 @@ WITH_ADB_INSECURE := false
 # Extras
 TARGET_INCLUDE_SIMPLE_TUNE := true
 
+#AxionFX
+TARGET_INCLUDE_AXFX := true
+
+
 # Maintainer
 ALPHA_BUILD_TYPE := Official
 ALPHA_MAINTAINER := OscarM1019

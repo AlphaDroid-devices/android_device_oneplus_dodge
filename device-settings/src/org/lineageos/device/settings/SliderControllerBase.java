@@ -89,6 +89,7 @@ public abstract class SliderControllerBase {
         }
         return ret;
     }
+
     private void doHapticFeedback() {
         if (mVibrator == null) {
             return;

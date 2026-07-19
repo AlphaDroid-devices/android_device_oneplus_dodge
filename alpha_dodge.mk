@@ -19,6 +19,9 @@ TARGET_HAS_UDFPS := true
 TARGET_ENABLE_BLUR := true
 TARGET_EXCLUDES_AUDIOFX := true
 TARGET_FACE_UNLOCK_SUPPORTED := true
+# Known-good bring-up: high_pwm feed + fusion consumer. Lux/bri work; CWB R/G/B
+# still 0 (client threadLoop neutered for boot safety).
+TARGET_FUSIONLIGHT_ENABLE := true
 
 # Build config
 

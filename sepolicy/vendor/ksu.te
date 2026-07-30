@@ -1,0 +1,5 @@
+# KernelSU transitions privileged processes to u:r:ksu:s0. The domain
+# attribute makes that process context valid for Android's r role.
+type ksu, domain;
+
+dontaudit vendor_hal_perf_default ksu:dir search;

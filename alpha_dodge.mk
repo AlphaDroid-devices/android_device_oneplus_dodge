@@ -19,9 +19,8 @@ TARGET_HAS_UDFPS := true
 TARGET_ENABLE_BLUR := true
 TARGET_EXCLUDES_AUDIOFX := true
 TARGET_FACE_UNLOCK_SUPPORTED := true
-# Feed props ON. Keep persist.alpha.fusion_light seeded 0 — enable with
-# setprop after boot (never seed 1 until cold-boot proven).
 TARGET_FUSIONLIGHT_ENABLE := true
+ALPHA_VERSION_APPEND_TIME_OF_DAY := false
 
 # Build config
 
@@ -48,9 +47,11 @@ WITH_ADB_INSECURE := false
 
 # Extras
 TARGET_INCLUDE_SIMPLE_TUNE := true
+TARGET_PREBUILT_BCR := true
 
 #AxionFX
 TARGET_INCLUDE_AXFX := true
+
 
 
 # Maintainer

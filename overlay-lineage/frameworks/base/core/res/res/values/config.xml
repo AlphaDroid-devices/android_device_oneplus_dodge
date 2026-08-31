@@ -16,4 +16,8 @@
         <item>org.lineageos.device.settings.KeyHandler</item>
         <item>com.android.settings.lineage.gestures.KeyHandler</item>
     </string-array>
+
+    <!-- SoftwareMusicHal + QuickLook session. Default is false in frameworks;
+         overlay true after the device is validated for background recognition. -->
+    <bool name="config_supportsBackgroundMusicRecognition">true</bool>
 </resources>

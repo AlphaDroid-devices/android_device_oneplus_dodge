@@ -58,6 +58,21 @@ public class DeviceSettingsActivity extends CollapsingToolbarBaseActivity {
             collapsingToolbar.setScrimAnimationDuration(300);
 
             View bannerLayout = getLayoutInflater().inflate(R.layout.oplus_banner_layout, collapsingToolbar, false);
+
+            // The artwork drives the header height; SettingsLib otherwise pins it
+            // to settingslib_toolbar_layout_height (179dp) and clips the banner.
+            bannerLayout.measure(
+                    View.MeasureSpec.makeMeasureSpec(
+                            getResources().getDisplayMetrics().widthPixels,
+                            View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+            int headerHeight = bannerLayout.getMeasuredHeight();
+            if (headerHeight > 0) {
+                ViewGroup.LayoutParams clp = collapsingToolbar.getLayoutParams();
+                clp.height = headerHeight;
+                collapsingToolbar.setLayoutParams(clp);
+            }
+
             collapsingToolbar.addView(bannerLayout, 0);
             banner = bannerLayout.findViewById(R.id.banner);
 
@@ -81,7 +96,7 @@ public class DeviceSettingsActivity extends CollapsingToolbarBaseActivity {
         if (contentLayout != null) {
             ViewGroup.MarginLayoutParams mlp = (ViewGroup.MarginLayoutParams) contentLayout.getLayoutParams();
             int topMarginPx = (int) TypedValue.applyDimension(
-                    TypedValue.COMPLEX_UNIT_DIP, 48, contentLayout.getResources().getDisplayMetrics());
+                    TypedValue.COMPLEX_UNIT_DIP, 8, contentLayout.getResources().getDisplayMetrics());
             mlp.setMargins(mlp.leftMargin, topMarginPx, mlp.rightMargin, mlp.bottomMargin);
             contentLayout.setLayoutParams(mlp);
         }

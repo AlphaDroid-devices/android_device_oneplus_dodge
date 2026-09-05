@@ -45,6 +45,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 
 import org.lineageos.device.settings.Constants;
+import org.lineageos.device.settings.display.AodBrightnessController;
 import org.lineageos.device.settings.display.DisplayModeController;
 import org.lineageos.device.settings.display.HbmController;
 import org.lineageos.device.settings.display.PwmController;
@@ -73,12 +74,14 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
     private SwitchPreferenceCompat mOnePulsePWMSwitch;
     private SwitchPreferenceCompat mHbmSwitch;
     private SwitchPreferenceCompat mSunlightBoostSwitch;
+    private SwitchPreferenceCompat mAodHighBrightnessSwitch;
     private SwitchPreferenceCompat mFastChargingSwitch;
     private SwitchPreferenceCompat mNightChargingSwitch;
 
     private HbmController mHbmController;
     private PwmController mPwmController;
     private DisplayModeController mDisplayModeController;
+    private AodBrightnessController mAodBrightnessController;
     private FastChargeController mFastChargeController;
 
     @Override
@@ -88,6 +91,7 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
         mHbmController = HbmController.getInstance(getContext());
         mPwmController = PwmController.getInstance(getContext());
         mDisplayModeController = DisplayModeController.getInstance(getContext());
+        mAodBrightnessController = AodBrightnessController.getInstance(getContext());
         mFastChargeController = FastChargeController.getInstance(getContext());
 
         mOnePulsePWMSwitch = (SwitchPreferenceCompat) findPreference(Constants.KEY_ONEPULSE_PWM);
@@ -113,6 +117,18 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
             mSunlightBoostSwitch.setOnPreferenceChangeListener(this);
         } else {
             mSunlightBoostSwitch.setEnabled(false);
+        }
+
+        mAodHighBrightnessSwitch =
+                (SwitchPreferenceCompat) findPreference(Constants.KEY_AOD_HIGH_BRIGHTNESS);
+        if (mAodHighBrightnessSwitch != null) {
+            if (FileUtils.isFileWritable(Constants.NODE_AOD_LIGHT_MODE)) {
+                mAodHighBrightnessSwitch.setChecked(
+                        mAodBrightnessController.isHighBrightnessEnabled());
+                mAodHighBrightnessSwitch.setOnPreferenceChangeListener(this);
+            } else {
+                removePref(mAodHighBrightnessSwitch);
+            }
         }
 
         mFastChargingSwitch = (SwitchPreferenceCompat) findPreference(Constants.KEY_FAST_CHARGING);
@@ -232,6 +248,12 @@ public class DeviceSettings extends SettingsBasePreferenceFragment
             return true;
         } else if (preference == mNightChargingSwitch) {
             mFastChargeController.setNightModeEnabled((Boolean) newValue);
+            return true;
+        } else if (preference == mAodHighBrightnessSwitch) {
+            boolean high = (Boolean) newValue;
+            if (!mAodBrightnessController.setHighBrightness(high)) {
+                Log.w(TAG, "Failed to set AOD high brightness=" + high);
+            }
             return true;
         } else if (preference == mSunlightBoostSwitch) {
             boolean enabled = (Boolean) newValue;

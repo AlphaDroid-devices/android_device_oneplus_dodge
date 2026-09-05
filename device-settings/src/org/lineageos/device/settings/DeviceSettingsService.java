@@ -25,6 +25,7 @@ import androidx.preference.PreferenceManager;
 
 import org.lineageos.device.settings.bypasschrg.BypassChargingController;
 import org.lineageos.device.settings.bypasschrg.BypassChargingManager;
+import org.lineageos.device.settings.display.AodBrightnessController;
 import org.lineageos.device.settings.display.DisplayModeController;
 import org.lineageos.device.settings.display.HbmController;
 import org.lineageos.device.settings.display.PwmController;
@@ -80,8 +81,19 @@ public class DeviceSettingsService extends Service {
         initializePwm();
         initializeTestTe();
         initializeSunlightBoost();
+        initializeAodBrightness();
         initializeGameBar();
         initializeRefreshRate();
+    }
+
+    private void initializeAodBrightness() {
+        if (Constants.DEBUG) Log.i(TAG, "Initializing AOD brightness");
+        try {
+            AodBrightnessController.getInstance(this).restoreAodBrightness();
+            if (Constants.DEBUG) Log.i(TAG, "AOD brightness initialized");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to initialize AOD brightness", e);
+        }
     }
 
     private void initializeSunlightBoost() {

@@ -8,5 +8,5 @@ allow system_app vendor_sysfs_usb_supply:file read;
 # Gamebar
 allow system_app { proc_stat vendor_sysfs_kgsl vendor_sysfs_kgsl_gpuclk }:file r_file_perms;
 
-# OnePulse PWM
+# OnePulse PWM / HBM / AOD light mode under /sys/kernel/oplus_display
 rw_dir_file(system_app, vendor_sysfs_graphics);

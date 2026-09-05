@@ -254,6 +254,10 @@
     <string name="hbm_btn_enable">Enable</string>
     <string name="hbm_warning_dont_show_again">Don\'t show this warning again</string>
 
+    <!-- AOD brightness (stock: 10 nits default, 50 nits optional high) -->
+    <string name="aod_high_brightness_title">High brightness AOD</string>
+    <string name="aod_high_brightness_summary">Use 50 nits for Always On Display instead of the default 10 nits</string>
+
     <!-- Refresh Rate Settings -->
     <string name="refresh_rate_title">Refresh rate</string>
     <string name="refresh_rate_app_title">Per-App Refresh Rate</string>

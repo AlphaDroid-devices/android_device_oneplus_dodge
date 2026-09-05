@@ -147,6 +147,12 @@ public class Constants {
      *  stock hbm_lux_table thresholds (enter 40000 lux, exit 20000 lux). */
     public static final String KEY_SUNLIGHT_BOOST = "sunlight_boost";
 
+    /** AOD brightness, stock binary levels via OFP: write 0 = high (~50 nits),
+     *  1 = low (~10 nits). Default is low, matching ColorOS. */
+    public static final String NODE_AOD_LIGHT_MODE =
+            "/sys/kernel/oplus_display/aod_light_mode_set";
+    public static final String KEY_AOD_HIGH_BRIGHTNESS = "aod_high_brightness";
+
     /** Panel test-TE counter: real DDIC self-refresh rate (LTPO). Write "1" to
      *  enable the irq (done at boot by DeviceSettingsService); reads return the
      *  measured rate, or 0 until two TE pulses have been observed. Consumed by the

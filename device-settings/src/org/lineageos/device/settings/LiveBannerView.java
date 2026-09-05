@@ -247,7 +247,7 @@ public class LiveBannerView extends View {
         card(c);
         final float cw = mTmp.width(), ch = mTmp.height();
         final float pad = cw * 0.042f;
-        final float base = mTmp.top + ch * 0.440f;
+        final float base = mTmp.top + ch * 0.410f;
 
         mText.setTypeface(mMedium);
         mText.setLetterSpacing(0.14f);
@@ -264,7 +264,7 @@ public class LiveBannerView extends View {
         cv.drawText(ram, mTmp.right - pad - mText.measureText(ram), base, mText);
 
         final float gl = mTmp.left + pad, gr = mTmp.right - pad;
-        final float gt = mTmp.top + ch * 0.560f, gb = mTmp.bottom - ch * 0.120f;
+        final float gt = mTmp.top + ch * 0.530f, gb = mTmp.bottom - ch * 0.100f;
 
         mLine.setColor(0x26FFFFFF);
         mLine.setStrokeWidth(Math.max(1f, ch * 0.016f));
@@ -272,28 +272,35 @@ public class LiveBannerView extends View {
 
         if (mRamCount < 2) return;
 
+        // RAM moves by a couple of percent, so a fixed 0-100% scale flattens the
+        // trace against the floor and the fill under it reads as a solid slab.
+        // Track the window's own range instead, with a floor on the span so a
+        // dead-flat window does not get amplified into noise.
+        float lo = 1f, hi = 0f;
+        for (int i = 0; i < mRamCount; i++) {
+            final float v = clamp01(mRamHist[i]);
+            lo = Math.min(lo, v);
+            hi = Math.max(hi, v);
+        }
+        float span = Math.max(hi - lo, 0.04f);
+        lo -= span * 0.15f;
+        span *= 1.30f;
+
         // stretch to the full width whatever the sample count, so a freshly
         // opened screen never shows a stub of a trace bunched up on the right
         final float step = (gr - gl) / (mRamCount - 1);
-        buildTrace(gl, step, gt, gb);
-        mPath.lineTo(gr, gb);
-        mPath.lineTo(gl, gb);
-        mPath.close();
-        mFill.setShader(new LinearGradient(0, gt, 0, gb,
-                0x3DE8763C, 0x00E8763C, Shader.TileMode.CLAMP));
-        cv.drawPath(mPath, mFill);
-        mFill.setShader(null);
-
-        buildTrace(gl, step, gt, gb);
+        // no area fill: at this plot height it just reads as a solid orange bar
+        buildTrace(gl, step, gt, gb, lo, span);
         mLine.setColor(COL_ORANGE);
         mLine.setStrokeWidth(Math.max(1.5f, ch * 0.030f));
         cv.drawPath(mPath, mLine);
     }
 
-    private void buildTrace(float gl, float step, float gt, float gb) {
+    private void buildTrace(float gl, float step, float gt, float gb,
+                            float lo, float span) {
         mPath.reset();
         for (int i = 0; i < mRamCount; i++) {
-            final float y = gb - (gb - gt) * clamp01(mRamHist[i]);
+            final float y = gb - (gb - gt) * clamp01((mRamHist[i] - lo) / span);
             if (i == 0) mPath.moveTo(gl, y); else mPath.lineTo(gl + step * i, y);
         }
     }

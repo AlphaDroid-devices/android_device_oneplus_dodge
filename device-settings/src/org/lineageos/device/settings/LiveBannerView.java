@@ -11,7 +11,6 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.LinearGradient;
 import android.graphics.Paint;
-import android.graphics.Path;
 import android.graphics.RectF;
 import android.graphics.Shader;
 import android.graphics.Typeface;
@@ -47,24 +46,19 @@ public class LiveBannerView extends View {
     private static final int COL_CYAN   = 0xFF55B4D8;
     private static final int COL_TEAL   = 0xFF5FC9B0;
     private static final int COL_ORANGE = 0xFFE8763C;
+    private static final int COL_AMBER  = 0xFFE3A94F;
 
-    private static final int HISTORY = 40;
     private static final long PERIOD_MS = 1000L;
 
     private final Paint mBmp   = new Paint(Paint.FILTER_BITMAP_FLAG | Paint.DITHER_FLAG);
     private final Paint mText  = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mFill  = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint mLine  = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Path  mPath  = new Path();
     private final RectF mDst   = new RectF();
     private final RectF mTmp   = new RectF();
 
     private final Typeface mLight   = Typeface.create("sans-serif-light", Typeface.NORMAL);
     private final Typeface mRegular = Typeface.create("sans-serif", Typeface.NORMAL);
     private final Typeface mMedium  = Typeface.create("sans-serif-medium", Typeface.NORMAL);
-
-    private final float[] mRamHist = new float[HISTORY];
-    private int mRamCount;
 
     private Bitmap mArt;
     private HandlerThread mThread;
@@ -85,9 +79,6 @@ public class LiveBannerView extends View {
         BitmapFactory.Options o = new BitmapFactory.Options();
         o.inScaled = false;                 // draw at native pixels, not mdpi-upscaled
         mArt = BitmapFactory.decodeResource(getResources(), R.drawable.oplus_banner, o);
-        mLine.setStyle(Paint.Style.STROKE);
-        mLine.setStrokeCap(Paint.Cap.ROUND);
-        mLine.setStrokeJoin(Paint.Join.ROUND);
     }
 
     /** Height follows the artwork, so the toolbar can be sized from this view. */
@@ -115,22 +106,12 @@ public class LiveBannerView extends View {
                 if (mem != null) {
                     mRamTotalGb = mem[0] / 1048576f;
                     mRamUsedGb = (mem[0] - mem[1]) / 1048576f;
-                    pushRam(mRamTotalGb > 0 ? mRamUsedGb / mRamTotalGb : 0f);
                 }
                 invalidate();
             });
             if (mPoller != null) mPoller.postDelayed(this, PERIOD_MS);
         }
     };
-
-    private void pushRam(float v) {
-        if (mRamCount < HISTORY) {
-            mRamHist[mRamCount++] = v;
-        } else {
-            System.arraycopy(mRamHist, 1, mRamHist, 0, HISTORY - 1);
-            mRamHist[HISTORY - 1] = v;
-        }
-    }
 
     private void startPolling() {
         if (mPoller != null) return;
@@ -187,7 +168,8 @@ public class LiveBannerView extends View {
                 clamp01((mTemp - 20f) / 50f), COL_ORANGE);
         drawMeter(canvas, CARDS[2], "DISPLAY", fpsText(),
                 mMaxHz > 0 ? clamp01(mFps / mMaxHz) : 0f, COL_TEAL);
-        drawGraph(canvas, CARDS[3]);
+        drawMeter(canvas, CARDS[3], "RAM ALLOCATION", ramText(),
+                mRamTotalGb > 0 ? clamp01(mRamUsedGb / mRamTotalGb) : 0f, COL_AMBER);
         drawLockup(canvas);
     }
 
@@ -195,6 +177,11 @@ public class LiveBannerView extends View {
         if (Float.isNaN(mFps)) return "--";
         return mMaxHz > 0 ? String.format(Locale.US, "%.0f / %.0f FPS", mFps, mMaxHz)
                           : String.format(Locale.US, "%.0f FPS", mFps);
+    }
+
+    private String ramText() {
+        return mRamTotalGb <= 0 ? "--"
+                : String.format(Locale.US, "%.1f / %.0f GB", mRamUsedGb, mRamTotalGb);
     }
 
     private static float clamp01(float v) {
@@ -240,68 +227,6 @@ public class LiveBannerView extends View {
                     accent & 0x99FFFFFF, accent, Shader.TileMode.CLAMP));
             cv.drawRoundRect(x0, top, Math.max(x1, x0 + bh), top + bh, r, r, mFill);
             mFill.setShader(null);
-        }
-    }
-
-    private void drawGraph(Canvas cv, float[] c) {
-        card(c);
-        final float cw = mTmp.width(), ch = mTmp.height();
-        final float pad = cw * 0.042f;
-        final float base = mTmp.top + ch * 0.410f;
-
-        mText.setTypeface(mMedium);
-        mText.setLetterSpacing(0.14f);
-        mText.setTextSize(ch * 0.225f);
-        mText.setColor(COL_LABEL);
-        cv.drawText("RAM ALLOCATION", mTmp.left + pad, base, mText);
-
-        mText.setTypeface(mLight);
-        mText.setLetterSpacing(0f);
-        mText.setTextSize(ch * 0.380f);
-        mText.setColor(COL_VALUE);
-        final String ram = mRamTotalGb <= 0 ? "--"
-                : String.format(Locale.US, "%.1f / %.0f GB", mRamUsedGb, mRamTotalGb);
-        cv.drawText(ram, mTmp.right - pad - mText.measureText(ram), base, mText);
-
-        final float gl = mTmp.left + pad, gr = mTmp.right - pad;
-        final float gt = mTmp.top + ch * 0.530f, gb = mTmp.bottom - ch * 0.100f;
-
-        mLine.setColor(0x26FFFFFF);
-        mLine.setStrokeWidth(Math.max(1f, ch * 0.016f));
-        cv.drawLine(gl, gb, gr, gb, mLine);
-
-        if (mRamCount < 2) return;
-
-        // RAM moves by a couple of percent, so a fixed 0-100% scale flattens the
-        // trace against the floor and the fill under it reads as a solid slab.
-        // Track the window's own range instead, with a floor on the span so a
-        // dead-flat window does not get amplified into noise.
-        float lo = 1f, hi = 0f;
-        for (int i = 0; i < mRamCount; i++) {
-            final float v = clamp01(mRamHist[i]);
-            lo = Math.min(lo, v);
-            hi = Math.max(hi, v);
-        }
-        float span = Math.max(hi - lo, 0.04f);
-        lo -= span * 0.15f;
-        span *= 1.30f;
-
-        // stretch to the full width whatever the sample count, so a freshly
-        // opened screen never shows a stub of a trace bunched up on the right
-        final float step = (gr - gl) / (mRamCount - 1);
-        // no area fill: at this plot height it just reads as a solid orange bar
-        buildTrace(gl, step, gt, gb, lo, span);
-        mLine.setColor(COL_ORANGE);
-        mLine.setStrokeWidth(Math.max(1.5f, ch * 0.030f));
-        cv.drawPath(mPath, mLine);
-    }
-
-    private void buildTrace(float gl, float step, float gt, float gb,
-                            float lo, float span) {
-        mPath.reset();
-        for (int i = 0; i < mRamCount; i++) {
-            final float y = gb - (gb - gt) * clamp01((mRamHist[i] - lo) / span);
-            if (i == 0) mPath.moveTo(gl, y); else mPath.lineTo(gl + step * i, y);
         }
     }
 

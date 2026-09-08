@@ -12,6 +12,8 @@ on boot
     # already opens this, repeated here so we do not depend on it
     chown system system /sys/kernel/oplus_display/aod_light_mode_set
     chmod 0666 /sys/kernel/oplus_display/aod_light_mode_set
+    chown system system /sys/kernel/oplus_display/write_panel_reg
+    chmod 0666 /sys/kernel/oplus_display/write_panel_reg
     # Panel test-TE counter (real DDIC refresh rate); DeviceSettingsService
     # writes 1 at boot to enable the irq, GameBar FPS meter reads the rate
     chown system system /sys/kernel/oplus_display/test_te

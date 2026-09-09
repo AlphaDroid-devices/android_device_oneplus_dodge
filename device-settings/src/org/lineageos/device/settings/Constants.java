@@ -152,12 +152,6 @@ public class Constants {
     public static final String NODE_AOD_LIGHT_MODE =
             "/sys/kernel/oplus_display/aod_light_mode_set";
     public static final String KEY_AOD_HIGH_BRIGHTNESS = "aod_high_brightness";
-    /** AA569 AOD brightness is page 0x1E register 0x81 (PeakLumin), not 0x51.
-     *  Live writes while already in AOD go through this node. */
-    public static final String NODE_WRITE_PANEL_REG =
-            "/sys/kernel/oplus_display/write_panel_reg";
-    public static final String NODE_POWER_STATUS =
-            "/sys/kernel/oplus_display/power_status";
 
     /** Panel test-TE counter: real DDIC self-refresh rate (LTPO). Write "1" to
      *  enable the irq (done at boot by DeviceSettingsService); reads return the

@@ -14,18 +14,14 @@ import org.lineageos.device.settings.Constants;
 import org.lineageos.device.settings.utils.FileUtils;
 
 /**
- * AOD brightness on dodge (AA569). 0x51 is ignored in idle; the panel uses
- * page 0x1E register 0x81 (PeakLumin dimming): 0x00 = high, 0x10 = low.
- * {@link Constants#NODE_AOD_LIGHT_MODE} is stored for the kernel LP1 hook.
- * Live changes while already in AOD also poke 0x81 through write_panel_reg.
+ * AOD brightness on dodge (AA569). Store 0 (high) / 1 (low) in
+ * {@link Constants#NODE_AOD_LIGHT_MODE} so the kernel LP1 hook can latch
+ * DBV before enter_idle. Do not poke write_panel_reg from here: DSI clocks
+ * in idle flash the panel and then idle re-dims it.
  */
 public class AodBrightnessController {
     private static final String TAG = "AodBrightnessController";
     private static AodBrightnessController sInstance;
-
-    /** SDE_MODE_DPMS_LP1 / LP2. */
-    private static final int POWER_LP1 = 1;
-    private static final int POWER_LP2 = 2;
 
     private final SharedPreferences mSharedPrefs;
 
@@ -69,19 +65,9 @@ public class AodBrightnessController {
         }
     }
 
-    /**
-     * Re-apply PeakLumin if the panel is already in LP1/LP2. Used after doze
-     * entry so a live 0x81 write lands after LP1, not during the transition.
-     */
-    public void applyIfInAod() {
-        if (!isInAod()) {
-            return;
-        }
-        applyPeakLumin(isHighBrightnessEnabled());
-    }
-
     private boolean apply(boolean highBrightness) {
-        final String nodeValue = highBrightness ? "0" : "1";
+        // "force" tells OFP to ignore lux_aod overwrites from the sensors HAL.
+        final String nodeValue = highBrightness ? "0 force" : "1 force";
         if (!FileUtils.writeLine(Constants.NODE_AOD_LIGHT_MODE, nodeValue)) {
             Log.e(TAG, "Failed to write AOD light mode " + nodeValue);
             return false;
@@ -89,44 +75,8 @@ public class AodBrightnessController {
         mSharedPrefs.edit()
                 .putBoolean(Constants.KEY_AOD_HIGH_BRIGHTNESS, highBrightness)
                 .commit();
-        if (isInAod()) {
-            applyPeakLumin(highBrightness);
-        }
         Log.i(TAG, "AOD light mode set to " + nodeValue
                 + " (" + (highBrightness ? "high" : "low") + ")");
         return true;
-    }
-
-    private static boolean isInAod() {
-        String status = FileUtils.readLineTrimmed(Constants.NODE_POWER_STATUS);
-        if (status == null) {
-            return false;
-        }
-        int colon = status.lastIndexOf(':');
-        if (colon < 0 || colon + 1 >= status.length()) {
-            return false;
-        }
-        try {
-            int mode = Integer.parseInt(status.substring(colon + 1).trim());
-            return mode == POWER_LP1 || mode == POWER_LP2;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
-
-    private static void applyPeakLumin(boolean highBrightness) {
-        if (!FileUtils.isFileWritable(Constants.NODE_WRITE_PANEL_REG)) {
-            Log.w(TAG, "write_panel_reg is not writable");
-            return;
-        }
-        final String peaklumin = highBrightness ? "81 00" : "81 10";
-        boolean ok = FileUtils.writeLine(Constants.NODE_WRITE_PANEL_REG, "FF 5A A5 1E")
-                && FileUtils.writeLine(Constants.NODE_WRITE_PANEL_REG, peaklumin)
-                && FileUtils.writeLine(Constants.NODE_WRITE_PANEL_REG, "FF 5A A5 00");
-        if (ok) {
-            Log.i(TAG, "AOD PeakLumin 0x81=" + (highBrightness ? "00" : "10"));
-        } else {
-            Log.e(TAG, "Failed to write AOD PeakLumin register");
-        }
     }
 }

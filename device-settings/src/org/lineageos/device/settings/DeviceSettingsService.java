@@ -16,9 +16,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.os.Handler;
 import android.os.IBinder;
-import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -42,26 +40,12 @@ import org.lineageos.device.settings.utils.FileUtils;
 public class DeviceSettingsService extends Service {
     private static final String TAG = "DeviceSettingsService";
 
-    /** LP1 is ~3s after screen-off; AOD content can take 12-25s to settle. */
-    private static final long AOD_PEAKLUMIN_DELAY_MS = 4000;
-    private static final long AOD_PEAKLUMIN_RETRY_MS = 15000;
-
     private BroadcastReceiver mReceiver;
-    private Handler mHandler;
-    private final Runnable mApplyAodBrightness = () -> {
-        try {
-            AodBrightnessController.getInstance(this).applyIfInAod();
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to apply AOD PeakLumin", e);
-        }
-    };
 
     @Override
     public void onCreate() {
         super.onCreate();
         if (Constants.DEBUG) Log.i(TAG, "Service created");
-
-        mHandler = new Handler(Looper.getMainLooper());
 
         // Initialize all subsystems
         initializeSubsystems();
@@ -79,9 +63,6 @@ public class DeviceSettingsService extends Service {
     @Override
     public void onDestroy() {
         if (Constants.DEBUG) Log.i(TAG, "Service destroyed");
-        if (mHandler != null) {
-            mHandler.removeCallbacks(mApplyAodBrightness);
-        }
         unregisterReceivers();
         super.onDestroy();
     }
@@ -272,10 +253,11 @@ public class DeviceSettingsService extends Service {
     private void handleScreenOff() {
         if (Constants.DEBUG) Log.i(TAG, "Screen OFF");
 
-        if (mHandler != null) {
-            mHandler.removeCallbacks(mApplyAodBrightness);
-            mHandler.postDelayed(mApplyAodBrightness, AOD_PEAKLUMIN_DELAY_MS);
-            mHandler.postDelayed(mApplyAodBrightness, AOD_PEAKLUMIN_RETRY_MS);
+        // Re-assert before LP1 so lux_aod cannot win the race.
+        try {
+            AodBrightnessController.getInstance(this).restoreAodBrightness();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to restore AOD brightness on screen off", e);
         }
 
         // HBM (hbm_max) off on sleep is enforced by the kernel now
@@ -295,10 +277,6 @@ public class DeviceSettingsService extends Service {
 
     private void handleScreenOn() {
         if (Constants.DEBUG) Log.i(TAG, "Screen ON");
-
-        if (mHandler != null) {
-            mHandler.removeCallbacks(mApplyAodBrightness);
-        }
 
         // Sync HBM state: the kernel forced hbm_max off while the panel slept, so
         // reconcile our preference to the node and refresh the tile/switch, which

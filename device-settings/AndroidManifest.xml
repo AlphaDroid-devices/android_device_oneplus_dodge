@@ -40,7 +40,7 @@
         android:defaultToDeviceProtectedStorage="true"
         android:directBootAware="true"
         android:persistent="true"
-        android:theme="@style/Theme.SubSettingsBase.Expressive"
+        android:theme="@style/Theme.DeviceSettings"
         android:exported="true">
 
         <receiver android:name=".BootCompletedReceiver"
@@ -62,10 +62,15 @@
         <!-- Device Settings -->
         <activity
             android:name=".DeviceSettingsActivity"
+            android:label="@string/device_title"
+            android:icon="@drawable/ic_settings_device"
             android:exported="true">
             <intent-filter>
                 <action android:name="com.android.settings.action.EXTRA_SETTINGS" />
             </intent-filter>
+            <meta-data
+                android:name="com.android.settings.new_task"
+                android:value="true" />
             <meta-data
                 android:name="com.android.settings.category"
                 android:value="com.android.settings.category.ia.homepage" />
@@ -125,7 +130,6 @@
         <!-- BypassCharging activity -->
         <activity android:name=".bypasschrg.BypassChargingActivity"
             android:label="@string/bypass_charging_title"
-            android:theme="@style/Theme.SubSettingsBase.Expressive"
             android:exported="true">
             <meta-data
                 android:name="com.android.settings.summary"
@@ -176,7 +180,6 @@
         <activity
             android:name=".gamebar.GameBarSettingsActivity"
             android:label="@string/game_bar_title"
-            android:theme="@style/Theme.SubSettingsBase.Expressive"
             android:exported="true">
             <meta-data
                 android:name="com.android.settings.summary"
@@ -230,7 +233,6 @@
         <!-- Refresh rate activity -->
         <activity android:name=".refreshrate.RefreshRateActivity"
             android:label="@string/refresh_rate_app_title"
-            android:theme="@style/Theme.SubSettingsBase.Expressive"
             android:exported="true">
             <meta-data
                 android:name="com.android.settings.summary"

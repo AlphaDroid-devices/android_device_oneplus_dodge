@@ -11,6 +11,12 @@ $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base_telephony.mk)
 # Inherit from dodge device
 $(call inherit-product, device/oneplus/dodge/device.mk)
 
+# Stock UFF face HAL (vendor/oplus/opfaceunlock), not Paranoid Sense.
+# Must be set before common_full_phone.mk so Sense is not packaged and
+# ro.face.sense_service is not set (FaceService treats Sense as exclusive).
+TARGET_USES_OPLUS_FACEUNLOCK := true
+TARGET_FACE_UNLOCK_SUPPORTED := false
+
 # Inherit some common Lineage stuff.
 $(call inherit-product, vendor/alpha/config/common_full_phone.mk)
 
@@ -18,7 +24,6 @@ $(call inherit-product, vendor/alpha/config/common_full_phone.mk)
 TARGET_HAS_UDFPS := true
 TARGET_ENABLE_BLUR := true
 TARGET_EXCLUDES_AUDIOFX := true
-TARGET_FACE_UNLOCK_SUPPORTED := true
 TARGET_FUSIONLIGHT_ENABLE := true
 ALPHA_VERSION_APPEND_TIME_OF_DAY := false
 

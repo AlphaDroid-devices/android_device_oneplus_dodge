@@ -36,6 +36,9 @@ BUILD_BROKEN_VENDOR_PROPERTY_NAMESPACE := true
 
 # Fusion light sensor
 TARGET_USES_OPLUS_FUSIONLIGHT := true
+
+# OPLUS Face Unlock (UFF AIDL IFace). Sense stays off — see alpha_dodge.mk.
+TARGET_USES_OPLUS_FACEUNLOCK := true
 # Feed props ON. Keep persist.alpha.fusion_light seeded 0 — enable with
 # setprop after boot (never seed 1 until cold-boot proven).
 TARGET_FUSIONLIGHT_ENABLE := true
@@ -44,4 +47,5 @@ TARGET_FUSIONLIGHT_ENABLE := true
 # SEPolicy
 BOARD_VENDOR_SEPOLICY_DIRS += $(DEVICE_PATH)/sepolicy/vendor
 BOARD_VENDOR_SEPOLICY_DIRS += vendor/oplus/fusionlight/sepolicy/vendor
+BOARD_VENDOR_SEPOLICY_DIRS += vendor/oplus/opfaceunlock/sepolicy/vendor
 BOARD_SYSTEM_EXT_PRIVATE_SEPOLICY_DIRS += $(DEVICE_PATH)/sepolicy/private

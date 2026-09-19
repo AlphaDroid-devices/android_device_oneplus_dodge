@@ -144,3 +144,8 @@ $(call inherit-product-if-exists, vendor/oplus/camera/opluscamera.mk)
 # Fusion light sensor (content-immune ALS). Dormant until
 # persist.alpha.fusion_light=1 is set on device — see the repo README.
 $(call inherit-product-if-exists, vendor/oplus/fusionlight/fusionlight.mk)
+
+# OPLUS Face Unlock (UFF AIDL IFace). Do not combine with Paranoid Sense —
+# FaceService treats ro.face.sense_service as exclusive. See
+# vendor/oplus/opfaceunlock/README.md.
+$(call inherit-product-if-exists, vendor/oplus/opfaceunlock/opfaceunlock.mk)
